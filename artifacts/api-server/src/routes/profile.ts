@@ -27,7 +27,21 @@ router.post("/profile", async (req, res) => {
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.message });
     }
-    const { name, hasKids, numberOfKids, workSchedule, healthConditions, averageSleepHours, cycleLength, periodLength } = parsed.data;
+    const {
+      name,
+      hasKids,
+      numberOfKids,
+      workSchedule,
+      healthConditions,
+      averageSleepHours,
+      cycleLength,
+      periodLength,
+      workHours,
+      exercisePerWeek,
+      exerciseIntensity,
+      contraception,
+      hydration,
+    } = parsed.data;
     const result = await db.insert(profiles).values({
       name,
       hasKids,
@@ -37,6 +51,11 @@ router.post("/profile", async (req, res) => {
       averageSleepHours: averageSleepHours ?? null,
       cycleLength: cycleLength ?? null,
       periodLength: periodLength ?? null,
+      workHours: workHours ?? null,
+      exercisePerWeek: exercisePerWeek ?? null,
+      exerciseIntensity: exerciseIntensity ?? null,
+      contraception: contraception ?? null,
+      hydration: hydration ?? null,
     }).returning();
     return res.status(201).json(result[0]);
   } catch (err) {

@@ -47,6 +47,12 @@ export default function ProfileScreen() {
   const [hasKids, setHasKids] = useState(false);
   const [numberOfKids, setNumberOfKids] = useState(1);
   const [workSchedule, setWorkSchedule] = useState("full-time");
+  const [workHours, setWorkHours] = useState(8);
+  const [exercisePerWeek, setExercisePerWeek] = useState(3);
+  const [exerciseIntensity, setExerciseIntensity] = useState("moderate");
+  const [contraception, setContraception] = useState("unknown");
+  const [sleepHours, setSleepHours] = useState(7);
+  const [hydration, setHydration] = useState("okay");
   const [healthConditions, setHealthConditions] = useState("");
   const [cycleLength, setCycleLength] = useState(28);
   const [periodLength, setPeriodLength] = useState(5);
@@ -68,6 +74,12 @@ export default function ProfileScreen() {
       setHasKids(profile.hasKids ?? false);
       setNumberOfKids(profile.numberOfKids ?? 1);
       setWorkSchedule(profile.workSchedule ?? "full-time");
+      setWorkHours((profile as { workHours?: number }).workHours ?? 8);
+      setExercisePerWeek((profile as { exercisePerWeek?: number }).exercisePerWeek ?? 3);
+      setExerciseIntensity((profile as { exerciseIntensity?: string }).exerciseIntensity ?? "moderate");
+      setContraception((profile as { contraception?: string }).contraception ?? "unknown");
+      setSleepHours((profile as { sleepHours?: number }).sleepHours ?? 7);
+      setHydration((profile as { hydration?: string }).hydration ?? "okay");
       setHealthConditions(profile.healthConditions ?? "");
       setCycleLength(profile.cycleLength ?? 28);
       setPeriodLength(profile.periodLength ?? 5);
@@ -86,6 +98,12 @@ export default function ProfileScreen() {
       hasKids,
       numberOfKids: hasKids ? numberOfKids : undefined,
       workSchedule,
+      workHours,
+      exercisePerWeek,
+      exerciseIntensity,
+      contraception,
+      sleepHours,
+      hydration,
       healthConditions: healthConditions.trim() || undefined,
       cycleLength,
       periodLength,
@@ -228,6 +246,27 @@ export default function ProfileScreen() {
             </View>
           </View>
 
+          <View style={s.section}>
+            <Text style={[s.label, { color: colors.mutedForeground }]}>{t("workHours")}</Text>
+            <Text style={[s.sublabel, { color: colors.mutedForeground }]}>{t("workHoursSub")}</Text>
+            <View style={s.chipRow}>
+              {[0, 4, 6, 8, 10, 12].map((n) => (
+                <Pressable
+                  key={n}
+                  onPress={() => { Haptics.selectionAsync(); setWorkHours(n); }}
+                  style={[s.chip, {
+                    backgroundColor: workHours === n ? colors.primary : colors.card,
+                    borderColor: workHours === n ? colors.primary : colors.border,
+                  }]}
+                >
+                  <Text style={[s.chipText, { color: workHours === n ? colors.primaryForeground : colors.foreground }]}>
+                    {n === 0 ? t("wsNone") : `${n}h`}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
           {/* Kids */}
           <View style={s.section}>
             <Text style={[s.label, { color: colors.mutedForeground }]}>{t("doYouHaveKids")}</Text>
@@ -316,6 +355,119 @@ export default function ProfileScreen() {
               multiline
               numberOfLines={3}
             />
+          </View>
+
+          <View style={s.section}>
+            <Text style={[s.label, { color: colors.mutedForeground }]}>{t("exercise")}</Text>
+            <Text style={[s.sublabel, { color: colors.mutedForeground }]}>{t("exerciseSub")}</Text>
+            <Text style={[s.kidsLabel, { color: colors.mutedForeground }]}>{t("exerciseFreq")}</Text>
+            <View style={s.chipRow}>
+              {[0, 1, 2, 3, 4, 5, 6, 7].map((n) => (
+                <Pressable
+                  key={n}
+                  onPress={() => { Haptics.selectionAsync(); setExercisePerWeek(n); }}
+                  style={[s.chip, {
+                    backgroundColor: exercisePerWeek === n ? colors.primary : colors.card,
+                    borderColor: exercisePerWeek === n ? colors.primary : colors.border,
+                  }]}
+                >
+                  <Text style={[s.chipText, { color: exercisePerWeek === n ? colors.primaryForeground : colors.foreground }]}>
+                    {n === 0 ? t("exerciseNone") : t("exerciseTimes", { n: String(n) })}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={[s.kidsLabel, { color: colors.mutedForeground, marginTop: 14 }]}>{t("exerciseIntensity")}</Text>
+            <View style={s.chipRow}>
+              {["none", "light", "moderate", "hard"].map((n) => (
+                <Pressable
+                  key={n}
+                  onPress={() => { Haptics.selectionAsync(); setExerciseIntensity(n); }}
+                  style={[s.chip, {
+                    backgroundColor: exerciseIntensity === n ? colors.primary : colors.card,
+                    borderColor: exerciseIntensity === n ? colors.primary : colors.border,
+                  }]}
+                >
+                  <Text style={[s.chipText, { color: exerciseIntensity === n ? colors.primaryForeground : colors.foreground }]}>
+                    {n === "none" ? t("exerciseNone") : n === "light" ? t("exerciseLight") : n === "moderate" ? t("exerciseModerate") : t("exerciseHard")}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          <View style={s.section}>
+            <Text style={[s.label, { color: colors.mutedForeground }]}>{t("contraception")}</Text>
+            <Text style={[s.sublabel, { color: colors.mutedForeground }]}>{t("contraceptionSub")}</Text>
+            <View style={s.chipRow}>
+              {[
+                ["none", t("contraceptionNone")],
+                ["pill", t("contraceptionPill")],
+                ["iud", t("contraceptionIud")],
+                ["patch", t("contraceptionPatch")],
+                ["ring", t("contraceptionRing")],
+                ["shot", t("contraceptionShot")],
+                ["other", t("contraceptionOther")],
+                ["unknown", t("contraceptionUnknown")],
+              ].map(([value, label]) => (
+                <Pressable
+                  key={value}
+                  onPress={() => { Haptics.selectionAsync(); setContraception(value); }}
+                  style={[s.chip, {
+                    backgroundColor: contraception === value ? colors.primary : colors.card,
+                    borderColor: contraception === value ? colors.primary : colors.border,
+                  }]}
+                >
+                  <Text style={[s.chipText, { color: contraception === value ? colors.primaryForeground : colors.foreground }]}>
+                    {label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          <View style={s.section}>
+            <Text style={[s.label, { color: colors.mutedForeground }]}>{t("sleepHours")}</Text>
+            <Text style={[s.sublabel, { color: colors.mutedForeground }]}>{t("sleepHoursSub")}</Text>
+            <View style={s.chipRow}>
+              {[4, 5, 6, 7, 8, 9, 10].map((n) => (
+                <Pressable
+                  key={n}
+                  onPress={() => { Haptics.selectionAsync(); setSleepHours(n); }}
+                  style={[s.chip, {
+                    backgroundColor: sleepHours === n ? colors.primary : colors.card,
+                    borderColor: sleepHours === n ? colors.primary : colors.border,
+                  }]}
+                >
+                  <Text style={[s.chipText, { color: sleepHours === n ? colors.primaryForeground : colors.foreground }]}>{n}h</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          <View style={s.section}>
+            <Text style={[s.label, { color: colors.mutedForeground }]}>{t("hydration")}</Text>
+            <Text style={[s.sublabel, { color: colors.mutedForeground }]}>{t("hydrationSub")}</Text>
+            <View style={s.chipRow}>
+              {[
+                ["low", t("waterLow")],
+                ["okay", t("waterMedium")],
+                ["high", t("waterHigh")],
+              ].map(([value, label]) => (
+                <Pressable
+                  key={value}
+                  onPress={() => { Haptics.selectionAsync(); setHydration(value); }}
+                  style={[s.chip, {
+                    backgroundColor: hydration === value ? colors.primary : colors.card,
+                    borderColor: hydration === value ? colors.primary : colors.border,
+                  }]}
+                >
+                  <Text style={[s.chipText, { color: hydration === value ? colors.primaryForeground : colors.foreground }]}>
+                    {label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
 
           <Pressable
