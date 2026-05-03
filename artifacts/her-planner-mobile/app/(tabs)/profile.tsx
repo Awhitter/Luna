@@ -192,39 +192,6 @@ export default function ProfileScreen() {
             />
           </View>
 
-          {/* Language */}
-          <View style={s.section}>
-            <Text style={[s.label, { color: colors.mutedForeground }]}>{t("lunaLanguage")}</Text>
-            <Text style={[s.sublabel, { color: colors.mutedForeground }]}>{t("lunaLanguageSub")}</Text>
-            <View style={s.langRow}>
-              {LANGUAGES.map((lang) => {
-                const selected = language === lang.code;
-                return (
-                  <Pressable
-                    key={lang.code}
-                    onPress={() => handleLanguageSelect(lang.code)}
-                    style={[
-                      s.langBtn,
-                      {
-                        backgroundColor: selected ? colors.primary : colors.card,
-                        borderColor: selected ? colors.primary : colors.border,
-                        flex: 1,
-                      },
-                    ]}
-                  >
-                    <Text style={s.langFlag}>{lang.flag}</Text>
-                    <Text style={[s.langLabel, { color: selected ? colors.primaryForeground : colors.foreground }]}>
-                      {lang.label}
-                    </Text>
-                    {selected && (
-                      <Text style={[s.langCheck, { color: colors.primaryForeground }]}>✓</Text>
-                    )}
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
           {/* Work schedule */}
           <View style={s.section}>
             <Text style={[s.label, { color: colors.mutedForeground }]}>{t("workSchedule")}</Text>
@@ -483,6 +450,39 @@ export default function ProfileScreen() {
               </Text>
             )}
           </Pressable>
+
+          {/* Language */}
+          <View style={s.section}>
+            <Text style={[s.label, { color: colors.mutedForeground }]}>{t("lunaLanguage")}</Text>
+            <Text style={[s.sublabel, { color: colors.mutedForeground }]}>{t("lunaLanguageSub")}</Text>
+            <View style={s.langRow}>
+              {LANGUAGES.map((lang) => {
+                const selected = language === lang.code;
+                return (
+                  <Pressable
+                    key={lang.code}
+                    onPress={() => handleLanguageSelect(lang.code)}
+                    style={[
+                      s.langBtn,
+                      {
+                        backgroundColor: selected ? colors.primary : colors.card,
+                        borderColor: selected ? colors.primary : colors.border,
+                        flex: 1,
+                      },
+                    ]}
+                  >
+                    <Text style={s.langFlag}>{lang.flag}</Text>
+                    <Text style={[s.langLabel, { color: selected ? colors.primaryForeground : colors.foreground }]}>
+                      {lang.label}
+                    </Text>
+                    {selected && (
+                      <Text style={[s.langCheck, { color: colors.primaryForeground }]}>✓</Text>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
         </>
       )}
     </KeyboardAwareScrollViewCompat>
