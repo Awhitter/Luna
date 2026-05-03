@@ -15,9 +15,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { RingChart } from "@/components/RingChart";
 import { useColors } from "@/hooks/useColors";
 
-const DAYS_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function getWeekDates(): Date[] {
@@ -52,6 +52,14 @@ const PHASE_LABEL: Record<string, string> = {
   unknown: "—",
 };
 
+const PHASE_EMOJI: Record<string, string> = {
+  menstrual: "🌑",
+  follicular: "🌒",
+  ovulation: "🌕",
+  luteal: "🌖",
+  unknown: "🌙",
+};
+
 const CATEGORY_COLORS: Record<string, string> = {
   work: "#c0788a",
   personal: "#9b7fc4",
@@ -70,8 +78,6 @@ export default function WeekScreen() {
 
   const weekDates = getWeekDates();
   const today = toISO(new Date());
-  const weekStart = toISO(weekDates[0]);
-  const weekEnd = toISO(weekDates[6]);
 
   const { data: tasks, isLoading: loadingTasks } = useListTasks({});
   const { data: summary } = useGetTasksSummary();
@@ -100,84 +106,125 @@ export default function WeekScreen() {
     return map;
   }, [tasks]);
 
-  const completedCount = tasks?.filter((t) => t.completed).length ?? 0;
-  const totalCount = tasks?.length ?? 0;
-  const progress = totalCount > 0 ? completedCount / totalCount : 0;
-
-  const phaseColor = phase ? PHASE_COLORS[phase.phase] ?? PHASE_COLORS.unknown : PHASE_COLORS.unknown;
+  const phaseKey = phase?.phase ?? "unknown";
+  const phaseColor = PHASE_COLORS[phaseKey] ?? PHASE_COLORS.unknown;
 
   return (
     <ScrollView
-      style={[{ flex: 1, backgroundColor: colors.background }]}
-      contentContainerStyle={[{ paddingTop: topPad + 16, paddingBottom: bottomPad + 24, paddingHorizontal: 20 }]}
+      style={{ flex: 1, backgroundColor: colors.background }}
+      contentContainerStyle={{ paddingTop: topPad + 16, paddingBottom: bottomPad + 24 }}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={[s.heading, { color: colors.foreground }]}>This Week</Text>
+      <Text style={[s.heading, { color: colors.foreground, paddingHorizontal: 20 }]}>This Week</Text>
 
-      <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[s.cardTitle, { color: colors.foreground }]}>Cycle Phase</Text>
+      {/* ─── Task Ring Charts ─── */}
+      <View style={[s.ringCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[s.cardTitle, { color: colors.foreground }]}>Task Progress</Text>
+        <View style={s.ringsRow}>
+          <RingChart
+            completed={summary?.today?.completed ?? 0}
+            total={summary?.today?.total ?? 0}
+            size={88}
+            strokeWidth={8}
+            color={colors.primary}
+            bgColor={colors.muted}
+            label="Today"
+            labelColor={colors.foreground}
+            mutedColor={colors.mutedForeground}
+          />
+          <View style={[s.ringDiv, { backgroundColor: colors.border }]} />
+          <RingChart
+            completed={summary?.week?.completed ?? 0}
+            total={summary?.week?.total ?? 0}
+            size={88}
+            strokeWidth={8}
+            color="#9b7fc4"
+            bgColor={colors.muted}
+            label="Week"
+            labelColor={colors.foreground}
+            mutedColor={colors.mutedForeground}
+          />
+          <View style={[s.ringDiv, { backgroundColor: colors.border }]} />
+          <RingChart
+            completed={summary?.month?.completed ?? 0}
+            total={summary?.month?.total ?? 0}
+            size={88}
+            strokeWidth={8}
+            color="#d4a843"
+            bgColor={colors.muted}
+            label="Month"
+            labelColor={colors.foreground}
+            mutedColor={colors.mutedForeground}
+          />
+        </View>
+      </View>
+
+      {/* ─── Cycle Phase ─── */}
+      <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: phaseColor }]}>
         <View style={s.phaseRow}>
-          <View style={[s.phaseDot, { backgroundColor: phaseColor }]} />
-          <Text style={[s.phaseLabel, { color: colors.foreground }]}>
-            {phase ? PHASE_LABEL[phase.phase] : "—"}
-          </Text>
-          {phase?.dayInCycle != null && (
-            <Text style={[s.phaseSub, { color: colors.mutedForeground }]}>
-              Day {phase.dayInCycle}
-            </Text>
+          <Text style={s.phaseEmoji}>{PHASE_EMOJI[phaseKey]}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.phaseLabel, { color: phaseColor }]}>{PHASE_LABEL[phaseKey]}</Text>
+            {phase?.dayInCycle != null && (
+              <Text style={[s.phaseSub, { color: colors.mutedForeground }]}>Day {phase.dayInCycle} of cycle</Text>
+            )}
+          </View>
+          {phase?.nextPeriodIn != null && (
+            <View style={[s.nextPill, { backgroundColor: phaseColor + "22" }]}>
+              <Text style={[s.nextPillLabel, { color: phaseColor }]}>next period</Text>
+              <Text style={[s.nextPillDays, { color: phaseColor }]}>in {phase.nextPeriodIn}d</Text>
+            </View>
           )}
         </View>
         {phase?.energyExpectation && (
-          <Text style={[s.phaseExpect, { color: colors.mutedForeground }]}>
-            {phase.energyExpectation}
-          </Text>
+          <Text style={[s.phaseExpect, { color: colors.mutedForeground }]}>{phase.energyExpectation}</Text>
         )}
       </View>
 
+      {/* ─── Week Calendar + Energy ─── */}
       <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={s.taskHeader}>
-          <Text style={[s.cardTitle, { color: colors.foreground }]}>Tasks</Text>
-          <Text style={[s.taskCount, { color: colors.mutedForeground }]}>
-            {completedCount}/{totalCount}
-          </Text>
-        </View>
-        <View style={[s.progressBg, { backgroundColor: colors.muted }]}>
-          <View style={[s.progressFill, { backgroundColor: colors.primary, width: `${progress * 100}%` as `${number}%` }]} />
-        </View>
-      </View>
-
-      <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[s.cardTitle, { color: colors.foreground }]}>Week Overview</Text>
-        <View style={s.weekRow}>
+        <Text style={[s.cardTitle, { color: colors.foreground }]}>Week at a glance</Text>
+        <View style={s.weekGrid}>
           {weekDates.map((d, i) => {
             const iso = toISO(d);
             const isToday = iso === today;
-            const ctx = contextByDate[iso];
-            const energy = ctx?.energy ?? 0;
+            const energy = contextByDate[iso]?.energy ?? 0;
+            const barH = energy > 0 ? (energy / 5) * 44 : 0;
             return (
               <View key={i} style={s.dayCol}>
                 <Text style={[s.dayLetter, { color: isToday ? colors.primary : colors.mutedForeground }]}>
                   {DAY_NAMES[d.getDay()].slice(0, 1)}
                 </Text>
-                <Text style={[s.dayNum, {
-                  color: isToday ? colors.primaryForeground : colors.foreground,
-                  backgroundColor: isToday ? colors.primary : "transparent",
-                }]}>
-                  {d.getDate()}
-                </Text>
-                <View style={[s.energyBar, { backgroundColor: colors.muted }]}>
-                  <View style={[s.energyFill, {
-                    backgroundColor: energy > 0 ? colors.primary : "transparent",
-                    height: `${(energy / 5) * 100}%` as `${number}%`,
-                  }]} />
+                <View
+                  style={[
+                    s.dayBubble,
+                    isToday
+                      ? { backgroundColor: colors.primary }
+                      : { backgroundColor: "transparent" },
+                  ]}
+                >
+                  <Text style={[s.dayNum, { color: isToday ? colors.primaryForeground : colors.foreground }]}>
+                    {d.getDate()}
+                  </Text>
+                </View>
+                <View style={[s.energyTrack, { backgroundColor: colors.muted }]}>
+                  {barH > 0 && (
+                    <View
+                      style={[
+                        s.energyBar,
+                        { height: barH, backgroundColor: colors.primary + "cc" },
+                      ]}
+                    />
+                  )}
                 </View>
               </View>
             );
           })}
         </View>
-        <Text style={[s.barLabel, { color: colors.mutedForeground }]}>Energy levels this week</Text>
+        <Text style={[s.barNote, { color: colors.mutedForeground }]}>Energy levels logged this week</Text>
       </View>
 
+      {/* ─── By Category ─── */}
       {Object.keys(tasksByCategory).length > 0 && (
         <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[s.cardTitle, { color: colors.foreground }]}>By Category</Text>
@@ -186,18 +233,18 @@ export default function WeekScreen() {
             const done = catTasks.filter((t) => t.completed).length;
             const total = catTasks.length;
             const pct = total > 0 ? done / total : 0;
-            const color = CATEGORY_COLORS[cat] ?? colors.primary;
+            const clr = CATEGORY_COLORS[cat] ?? colors.primary;
             return (
               <View key={cat} style={s.catRow}>
                 <View style={s.catLabelRow}>
-                  <View style={[s.catDot, { backgroundColor: color }]} />
+                  <View style={[s.catDot, { backgroundColor: clr }]} />
                   <Text style={[s.catName, { color: colors.foreground }]}>
                     {cat.charAt(0).toUpperCase() + cat.slice(1)}
                   </Text>
                   <Text style={[s.catCount, { color: colors.mutedForeground }]}>{done}/{total}</Text>
                 </View>
-                <View style={[s.catBar, { backgroundColor: colors.muted }]}>
-                  <View style={[s.catBarFill, { backgroundColor: color, width: `${pct * 100}%` as `${number}%` }]} />
+                <View style={[s.catTrack, { backgroundColor: colors.muted }]}>
+                  <View style={[s.catFill, { backgroundColor: clr, width: `${pct * 100}%` as `${number}%` }]} />
                 </View>
               </View>
             );
@@ -206,7 +253,7 @@ export default function WeekScreen() {
       )}
 
       {loadingTasks && (
-        <View style={s.loadingRow}>
+        <View style={s.loading}>
           <ActivityIndicator color={colors.primary} />
         </View>
       )}
@@ -215,36 +262,34 @@ export default function WeekScreen() {
 }
 
 const s = StyleSheet.create({
-  heading: { fontSize: 28, fontFamily: "PlusJakartaSans_700Bold", marginBottom: 20 },
-  card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 16,
-  },
-  cardTitle: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 12 },
-  phaseRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 6 },
-  phaseDot: { width: 12, height: 12, borderRadius: 6 },
+  heading: { fontSize: 28, fontFamily: "PlusJakartaSans_700Bold", marginBottom: 16 },
+  ringCard: { marginHorizontal: 16, marginBottom: 14, borderRadius: 18, borderWidth: 1, padding: 18 },
+  card: { marginHorizontal: 16, marginBottom: 14, borderRadius: 18, borderWidth: 1, padding: 16 },
+  cardTitle: { fontSize: 12, fontFamily: "PlusJakartaSans_600SemiBold", textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 14 },
+  ringsRow: { flexDirection: "row", justifyContent: "space-evenly", alignItems: "center" },
+  ringDiv: { width: 1, height: 64 },
+  phaseRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
+  phaseEmoji: { fontSize: 28 },
   phaseLabel: { fontSize: 20, fontFamily: "PlusJakartaSans_700Bold" },
-  phaseSub: { fontSize: 14, fontFamily: "PlusJakartaSans_400Regular" },
-  phaseExpect: { fontSize: 14, fontFamily: "PlusJakartaSans_400Regular", lineHeight: 20 },
-  taskHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
-  taskCount: { fontSize: 14, fontFamily: "PlusJakartaSans_500Medium" },
-  progressBg: { height: 8, borderRadius: 4, overflow: "hidden" },
-  progressFill: { height: 8, borderRadius: 4 },
-  weekRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
+  phaseSub: { fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", marginTop: 1 },
+  nextPill: { borderRadius: 12, padding: 10, alignItems: "center" },
+  nextPillLabel: { fontSize: 10, fontFamily: "PlusJakartaSans_500Medium" },
+  nextPillDays: { fontSize: 18, fontFamily: "PlusJakartaSans_700Bold", marginTop: 1 },
+  phaseExpect: { fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", lineHeight: 19 },
+  weekGrid: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
   dayCol: { alignItems: "center", gap: 4, flex: 1 },
-  dayLetter: { fontSize: 11, fontFamily: "PlusJakartaSans_500Medium" },
-  dayNum: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold", width: 26, height: 26, borderRadius: 13, textAlign: "center", lineHeight: 26 },
-  energyBar: { width: 6, height: 32, borderRadius: 3, overflow: "hidden", justifyContent: "flex-end" },
-  energyFill: { width: 6, borderRadius: 3 },
-  barLabel: { fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", textAlign: "center", marginTop: 4 },
+  dayLetter: { fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold" },
+  dayBubble: { width: 26, height: 26, borderRadius: 13, justifyContent: "center", alignItems: "center" },
+  dayNum: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold" },
+  energyTrack: { width: 8, height: 44, borderRadius: 4, overflow: "hidden", justifyContent: "flex-end" },
+  energyBar: { width: 8, borderRadius: 4 },
+  barNote: { fontSize: 10, fontFamily: "PlusJakartaSans_400Regular", textAlign: "center", marginTop: 6 },
   catRow: { marginBottom: 12 },
-  catLabelRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
+  catLabelRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 5 },
   catDot: { width: 8, height: 8, borderRadius: 4 },
   catName: { flex: 1, fontSize: 14, fontFamily: "PlusJakartaSans_500Medium" },
-  catCount: { fontSize: 13, fontFamily: "PlusJakartaSans_400Regular" },
-  catBar: { height: 6, borderRadius: 3, overflow: "hidden" },
-  catBarFill: { height: 6, borderRadius: 3 },
-  loadingRow: { paddingVertical: 20, alignItems: "center" },
+  catCount: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular" },
+  catTrack: { height: 6, borderRadius: 3, overflow: "hidden" },
+  catFill: { height: 6, borderRadius: 3 },
+  loading: { paddingVertical: 24, alignItems: "center" },
 });
