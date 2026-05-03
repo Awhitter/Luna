@@ -38,6 +38,56 @@ const MOOD_KEYS = ["happy", "calm", "tired", "anxious", "motivated", "overwhelme
 
 const WIZARD_STEP_KEYS = ["sleep", "energy", "mood"] as const;
 
+const TODAY_STR = new Date().toISOString().split("T")[0];
+const WIZARD_SHOWN_KEY = "luna-wizard-shown";
+
+function hasWizardShownToday(): boolean {
+  return localStorage.getItem(WIZARD_SHOWN_KEY) === TODAY_STR;
+}
+function markWizardShownToday(): void {
+  localStorage.setItem(WIZARD_SHOWN_KEY, TODAY_STR);
+}
+
+function extractTasksFromText(text: string): {
+  cleanText: string;
+  taskData: { tasks: Array<{ title: string; category: string; priority: string; view: string }> } | null;
+} {
+  const marker = "[TASKS:";
+  const start = text.indexOf(marker);
+  if (start === -1) return { cleanText: text, taskData: null };
+
+  let depth = 0;
+  let jsonStart = -1;
+  let jsonEnd = -1;
+
+  for (let i = start + marker.length; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "{") {
+      if (depth === 0) jsonStart = i;
+      depth++;
+    } else if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        jsonEnd = i;
+        break;
+      }
+    }
+  }
+
+  if (jsonStart === -1 || jsonEnd === -1) return { cleanText: text, taskData: null };
+
+  const jsonStr = text.slice(jsonStart, jsonEnd + 1);
+  const closeIdx = text.indexOf("]", jsonEnd);
+  const fullMatch = closeIdx !== -1 ? text.slice(start, closeIdx + 1) : text.slice(start, jsonEnd + 2);
+
+  try {
+    const parsed = JSON.parse(jsonStr) as { tasks: Array<{ title: string; category: string; priority: string; view: string }> };
+    return { cleanText: text.replace(fullMatch, "").trim(), taskData: parsed };
+  } catch {
+    return { cleanText: text, taskData: null };
+  }
+}
+
 export default function TodayPage() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -65,7 +115,6 @@ export default function TodayPage() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
   const [wizardData, setWizardData] = useState({ sleepHours: 7, energyLevel: 7, mood: "" });
-  const [wizardAutoOpened, setWizardAutoOpened] = useState(false);
 
   const [suggestions, setSuggestions] = useState<SuggestionsData | null>(null);
   const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
@@ -73,13 +122,13 @@ export default function TodayPage() {
   const [addedSuggestions, setAddedSuggestions] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    if (!ctxLoading && !profileLoading && profile && !todayCtx && !wizardAutoOpened) {
-      setWizardAutoOpened(true);
+    if (!ctxLoading && !profileLoading && profile && !todayCtx && !hasWizardShownToday()) {
+      markWizardShownToday();
       setWizardOpen(true);
       setWizardStep(1);
       setWizardData({ sleepHours: 7, energyLevel: 7, mood: "" });
     }
-  }, [ctxLoading, profileLoading, profile, todayCtx, wizardAutoOpened]);
+  }, [ctxLoading, profileLoading, profile, todayCtx]);
 
   useEffect(() => {
     if (!profileLoading && !profile) setLocation("/settings");
@@ -225,18 +274,28 @@ export default function TodayPage() {
 
   const parseTasks = useCallback(
     (text: string) => {
-      const match = text.match(/\[TASKS:(\{.*?\})\]/s);
-      if (!match) return text;
-      try {
-        const parsed = JSON.parse(match[1]) as { tasks: Array<{ title: string; category: string; priority: string; view: string }> };
-        parsed.tasks.forEach((task) => {
-          createTask.mutate(
-            { data: { title: task.title, category: task.category, priority: task.priority as "low" | "medium" | "high", view: (task.view as "today" | "week" | "month") || "today", aiSuggested: true } },
-            { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListTasksQueryKey({ view: "today" }) }); queryClient.invalidateQueries({ queryKey: getGetTasksSummaryQueryKey() }); } }
-          );
-        });
-      } catch {}
-      return text.replace(/\[TASKS:\{.*?\}\]/s, "").trim();
+      const { cleanText, taskData } = extractTasksFromText(text);
+      if (!taskData) return text;
+      (taskData.tasks ?? []).forEach((task) => {
+        createTask.mutate(
+          {
+            data: {
+              title: task.title,
+              category: task.category || "home",
+              priority: (task.priority as "low" | "medium" | "high") || "medium",
+              view: (task.view as "today" | "week" | "month") || "today",
+              aiSuggested: true,
+            },
+          },
+          {
+            onSuccess: () => {
+              queryClient.invalidateQueries({ queryKey: getListTasksQueryKey({ view: "today" }) });
+              queryClient.invalidateQueries({ queryKey: getGetTasksSummaryQueryKey() });
+            },
+          }
+        );
+      });
+      return cleanText;
     },
     [createTask, queryClient]
   );
@@ -491,7 +550,7 @@ export default function TodayPage() {
                   <div key={s.id} className={cn("h-1.5 rounded-full transition-all duration-300", s.id === wizardStep ? "w-6 bg-primary" : s.id < wizardStep ? "w-3 bg-primary/40" : "w-3 bg-muted")} />
                 ))}
               </div>
-              <button onClick={() => setWizardOpen(false)} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+              <button onClick={() => { markWizardShownToday(); setWizardOpen(false); }} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -558,7 +617,7 @@ export default function TodayPage() {
               {wizardStep < 3 ? <>{t.checkin.wizard.continue} <ChevronRight className="w-4 h-4" /></> : createDailyContext.isPending ? t.checkin.wizard.saving : t.checkin.wizard.startDay}
             </button>
 
-            <button onClick={() => setWizardOpen(false)} className="w-full text-center text-xs text-muted-foreground mt-3 py-1 hover:text-foreground transition-colors">
+            <button onClick={() => { markWizardShownToday(); setWizardOpen(false); }} className="w-full text-center text-xs text-muted-foreground mt-3 py-1 hover:text-foreground transition-colors">
               {t.checkin.wizard.skip}
             </button>
           </div>
