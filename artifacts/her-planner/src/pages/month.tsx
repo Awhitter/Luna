@@ -12,6 +12,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday } from "date-fns";
 import { ChevronLeft, ChevronRight, CheckCircle2, Circle, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/i18n/context";
 
 const phaseColors: Record<string, string> = {
   menstrual: "bg-red-100 text-red-600",
@@ -37,13 +38,13 @@ function getCycleDayPhase(dayOffset: number, cycleLength = 28, periodLength = 5)
 
 export default function MonthPage() {
   const queryClient = useQueryClient();
+  const { t } = useLanguage();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(new Date());
 
   const { data: tasks = [] } = useListTasks({ view: "month" });
   const updateTask = useUpdateTask();
   const createTask = useCreateTask();
-  const { data: cyclePhase } = useGetCurrentCyclePhase();
   const { data: cycleEntries = [] } = useListCycleEntries({ limit: 3 });
   const [addingTask, setAddingTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -64,13 +65,11 @@ export default function MonthPage() {
   };
 
   const selectedDayTasks = selectedDay
-    ? tasks.filter((t) => {
-        if (t.dueDate) return isSameDay(new Date(t.dueDate), selectedDay);
+    ? tasks.filter((tk) => {
+        if (tk.dueDate) return isSameDay(new Date(tk.dueDate), selectedDay);
         return isToday(selectedDay);
       })
     : [];
-
-  const selectedDayAllMonthTasks = selectedDay && isToday(selectedDay) ? tasks : selectedDayTasks;
 
   const toggleTask = (id: number, completed: boolean) => {
     updateTask.mutate(
@@ -116,38 +115,30 @@ export default function MonthPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-serif">{format(currentDate, "MMMM yyyy")}</h1>
-            <p className="text-sm text-muted-foreground">Monthly overview</p>
+            <p className="text-sm text-muted-foreground">{t.month.subtitle}</p>
           </div>
           <div className="flex gap-1">
-            <button
-              onClick={() => setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() - 1))}
-              className="w-9 h-9 rounded-xl border border-border flex items-center justify-center hover:bg-accent transition-colors"
-            >
+            <button onClick={() => setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() - 1))} className="w-9 h-9 rounded-xl border border-border flex items-center justify-center hover:bg-accent transition-colors">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <button
-              onClick={() => setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() + 1))}
-              className="w-9 h-9 rounded-xl border border-border flex items-center justify-center hover:bg-accent transition-colors"
-            >
+            <button onClick={() => setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() + 1))} className="w-9 h-9 rounded-xl border border-border flex items-center justify-center hover:bg-accent transition-colors">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Phase legend */}
         {lastPeriodDate && (
           <div className="flex gap-3 mt-3 flex-wrap">
-            {Object.entries(phaseColors).map(([phase, color]) => (
+            {Object.entries(phaseColors).map(([phase]) => (
               <div key={phase} className="flex items-center gap-1">
                 <span className={cn("w-2 h-2 rounded-full", phaseDotColors[phase])} />
-                <span className="text-xs text-muted-foreground capitalize">{phase}</span>
+                <span className="text-xs text-muted-foreground capitalize">{t.phases[phase] ?? phase}</span>
               </div>
             ))}
           </div>
         )}
       </header>
 
-      {/* Calendar grid */}
       <div className="px-5 pb-4">
         <div className="grid grid-cols-7 mb-2">
           {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
@@ -158,10 +149,9 @@ export default function MonthPage() {
           {Array.from({ length: firstDayOfWeek }).map((_, i) => <div key={`empty-${i}`} />)}
           {days.map((day) => {
             const phase = getDayPhase(day);
-            const dayTasks = tasks.filter((t) => t.dueDate && isSameDay(new Date(t.dueDate), day));
+            const dayTasks = tasks.filter((tk) => tk.dueDate && isSameDay(new Date(tk.dueDate), day));
             const isSelected = selectedDay && isSameDay(day, selectedDay);
             const todayDay = isToday(day);
-
             return (
               <button
                 key={day.toISOString()}
@@ -174,25 +164,19 @@ export default function MonthPage() {
                 )}
               >
                 <span className="mt-1.5">{format(day, "d")}</span>
-                {dayTasks.length > 0 && !isSelected && (
-                  <span className="absolute bottom-1 w-1 h-1 rounded-full bg-primary" />
-                )}
+                {dayTasks.length > 0 && !isSelected && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-primary" />}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Selected day tasks */}
       {selectedDay && (
         <div className="flex-1 px-5 pb-6">
           <div className="bg-card rounded-2xl border border-border overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <h3 className="text-sm font-medium">{isToday(selectedDay) ? "All month tasks" : format(selectedDay, "MMMM d")}</h3>
-              <button
-                onClick={() => setAddingTask(true)}
-                className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center hover:bg-accent transition-colors"
-              >
+              <h3 className="text-sm font-medium">{isToday(selectedDay) ? t.month.allMonthTasks : format(selectedDay, "MMMM d")}</h3>
+              <button onClick={() => setAddingTask(true)} className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center hover:bg-accent transition-colors">
                 <Plus className="w-3.5 h-3.5 text-muted-foreground" />
               </button>
             </div>
@@ -203,9 +187,7 @@ export default function MonthPage() {
                   <button onClick={() => toggleTask(task.id, task.completed)} className="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors">
                     {task.completed ? <CheckCircle2 className="w-5 h-5 text-primary" /> : <Circle className="w-5 h-5" />}
                   </button>
-                  <span className={cn("text-sm flex-1", task.completed ? "line-through text-muted-foreground" : "")}>
-                    {task.title}
-                  </span>
+                  <span className={cn("text-sm flex-1", task.completed ? "line-through text-muted-foreground" : "")}>{task.title}</span>
                 </div>
               ))}
 
@@ -217,17 +199,17 @@ export default function MonthPage() {
                     value={newTaskTitle}
                     onChange={(e) => setNewTaskTitle(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") addTask(); if (e.key === "Escape") { setAddingTask(false); setNewTaskTitle(""); } }}
-                    placeholder="Add task for this month..."
+                    placeholder={t.tasks.placeholder}
                     className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
                   />
-                  <button onClick={addTask} className="text-xs text-primary font-medium">Add</button>
-                  <button onClick={() => { setAddingTask(false); setNewTaskTitle(""); }} className="text-xs text-muted-foreground">Cancel</button>
+                  <button onClick={addTask} className="text-xs text-primary font-medium">{t.tasks.add}</button>
+                  <button onClick={() => { setAddingTask(false); setNewTaskTitle(""); }} className="text-xs text-muted-foreground">{t.tasks.cancel}</button>
                 </div>
               )}
 
               {tasks.length === 0 && !addingTask && (
                 <div className="px-4 py-6 text-center">
-                  <p className="text-xs text-muted-foreground">No tasks this month yet. Tap + to add one.</p>
+                  <p className="text-xs text-muted-foreground">{t.month.noTasks}</p>
                 </div>
               )}
             </div>
