@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { db, conversations, messages, profiles, cycleEntries, dailyContexts, tasks } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
@@ -12,6 +13,14 @@ import {
 } from "@workspace/api-zod";
 
 const router = Router();
+
+const aiRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests — please slow down" },
+});
 
 const LANGUAGE_NAMES: Record<string, string> = {
   en: "English",
@@ -125,7 +134,7 @@ Current context about her life:`;
 
   if (today) {
     if (today.sleepHours) ctx += `\n- Slept ${today.sleepHours} hours last night`;
-    if (today.energyLevel) ctx += `\n- Energy today: ${today.energyLevel}/10`;
+    if (today.energyLevel) ctx += `\n- Energy today: ${today.energyLevel}/5`;
     if (today.mood) ctx += `\n- Mood: ${today.mood}`;
   }
 
@@ -161,7 +170,7 @@ Be her Luna — specific, warm, and always in her corner.`;
   return ctx;
 }
 
-router.post("/openai/conversations/:id/messages", async (req, res) => {
+router.post("/openai/conversations/:id/messages", aiRateLimit, async (req, res) => {
   try {
     const idParsed = SendOpenaiMessageParams.safeParse({ id: Number(req.params.id) });
     if (!idParsed.success) return res.status(400).json({ error: "Invalid id" });
@@ -229,7 +238,7 @@ router.post("/openai/conversations/:id/messages", async (req, res) => {
   }
 });
 
-router.post("/openai/checkin-message", async (req, res) => {
+router.post("/openai/checkin-message", aiRateLimit, async (req, res) => {
   try {
     const { sleepHours, energyLevel, mood, language = "en", conversationId: convId } = req.body as {
       sleepHours?: number;
@@ -316,7 +325,7 @@ Respond ONLY with JSON: {"message": "your message here"}`;
   }
 });
 
-router.post("/openai/suggest-tasks", async (req, res) => {
+router.post("/openai/suggest-tasks", aiRateLimit, async (req, res) => {
   try {
     const language = (req.body?.language as string) || "en";
 
@@ -334,7 +343,7 @@ router.post("/openai/suggest-tasks", async (req, res) => {
     const systemContext = buildSystemContext(profile, lastPeriod, todayData, pendingTasks, language);
 
     const langName = LANGUAGE_NAMES[language] ?? "English";
-    const prompt = `Based on everything you know about her right now — her energy (${todayData?.energyLevel ?? "??"}/10), mood (${todayData?.mood ?? "unknown"}), sleep (${todayData?.sleepHours ?? "??"}h), her cycle phase, her life — suggest exactly 3 tasks she should do today.
+    const prompt = `Based on everything you know about her right now — her energy (${todayData?.energyLevel ?? "??"}/5), mood (${todayData?.mood ?? "unknown"}), sleep (${todayData?.sleepHours ?? "??"}h), her cycle phase, her life — suggest exactly 3 tasks she should do today.
 
 These must feel personally chosen for her, not generic.
 
@@ -368,7 +377,7 @@ Respond ONLY with valid JSON:
   }
 });
 
-router.post("/openai/weekly-recap", async (req, res) => {
+router.post("/openai/weekly-recap", aiRateLimit, async (req, res) => {
   try {
     const language = (req.body?.language as string) || "en";
 

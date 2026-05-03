@@ -2,8 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 
 import { LangCode, T } from "@/constants/translations";
-
-const STORAGE_KEY = "her-planner-language";
+import { STORAGE_KEYS } from "@/constants/storage";
 
 interface LanguageContextValue {
   language: LangCode;
@@ -21,7 +20,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<LangCode>("en");
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((val) => {
+    AsyncStorage.getItem(STORAGE_KEYS.language).then((val) => {
       if (val === "en" || val === "es" || val === "pt") {
         setLanguageState(val);
       }
@@ -30,7 +29,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   const setLanguage = useCallback(async (lang: LangCode) => {
     setLanguageState(lang);
-    await AsyncStorage.setItem(STORAGE_KEY, lang);
+    await AsyncStorage.setItem(STORAGE_KEYS.language, lang);
   }, []);
 
   const t = useCallback(

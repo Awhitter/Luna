@@ -34,6 +34,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RingChart } from "@/components/RingChart";
 import { useColors } from "@/hooks/useColors";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { PHASE_COLORS, PHASE_EMOJI } from "@/constants/cycle";
+import { STORAGE_KEYS } from "@/constants/storage";
 
 interface SuggestedTask {
   title: string;
@@ -56,17 +58,9 @@ function uid(): string {
   return `msg-${Date.now()}-${msgCounter}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-let convInitLock = false;
-
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const DAYS   = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
-const PHASE_EMOJI: Record<string, string> = {
-  menstrual: "🌑", follicular: "🌒", ovulation: "🌕", luteal: "🌖", unknown: "🌙",
-};
-const PHASE_COLORS: Record<string, string> = {
-  menstrual: "#e07070", follicular: "#70b070", ovulation: "#d4a843", luteal: "#9b7fc4", unknown: "#b0b0b0",
-};
 
 function formatTime(ts: number) {
   return new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
@@ -109,6 +103,7 @@ export default function TodayScreen() {
   const [checkinExpanded, setCheckinExpanded] = useState(false);
   const [newTaskText, setNewTaskText] = useState("");
   const initialized = useRef(false);
+  const convInitLockRef = useRef(false);
 
   const createConversation = useCreateOpenaiConversation();
   const createDailyContext = useCreateDailyContext();
@@ -147,26 +142,26 @@ export default function TodayScreen() {
 
   async function loadTodaySymptoms() {
     try {
-      const key = `today-symptoms-${new Date().toISOString().split("T")[0]}`;
+      const key = STORAGE_KEYS.todaySymptoms(new Date().toISOString().split("T")[0]!);
       const stored = await AsyncStorage.getItem(key);
       if (stored) setTodaySymptoms(JSON.parse(stored) as string[]);
     } catch {}
   }
 
   async function initConversation() {
-    if (convInitLock) return;
-    convInitLock = true;
+    if (convInitLockRef.current) return;
+    convInitLockRef.current = true;
     try {
-      const storedId = await AsyncStorage.getItem("luna-conversation-id");
+      const storedId = await AsyncStorage.getItem(STORAGE_KEYS.lunaConversation);
       if (storedId) {
         setConversationId(parseInt(storedId, 10));
       } else {
         const conv = await createConversation.mutateAsync({ data: { title: "Luna Chat" } });
         setConversationId(conv.id);
-        await AsyncStorage.setItem("luna-conversation-id", String(conv.id));
+        await AsyncStorage.setItem(STORAGE_KEYS.lunaConversation, String(conv.id));
       }
     } catch {
-      convInitLock = false;
+      convInitLockRef.current = false;
     }
   }
 

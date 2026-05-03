@@ -46,6 +46,8 @@ export default function ProfileScreen() {
   const [numberOfKids, setNumberOfKids] = useState(1);
   const [workSchedule, setWorkSchedule] = useState("full-time");
   const [healthConditions, setHealthConditions] = useState("");
+  const [cycleLength, setCycleLength] = useState(28);
+  const [periodLength, setPeriodLength] = useState(5);
   const [saved, setSaved] = useState(false);
   const initialized = useRef(false);
 
@@ -65,6 +67,8 @@ export default function ProfileScreen() {
       setNumberOfKids(profile.numberOfKids ?? 1);
       setWorkSchedule(profile.workSchedule ?? "full-time");
       setHealthConditions(profile.healthConditions ?? "");
+      setCycleLength(profile.cycleLength ?? 28);
+      setPeriodLength(profile.periodLength ?? 5);
     }
   }, [profile]);
 
@@ -81,6 +85,8 @@ export default function ProfileScreen() {
       numberOfKids: hasKids ? numberOfKids : undefined,
       workSchedule,
       healthConditions: healthConditions.trim() || undefined,
+      cycleLength,
+      periodLength,
     };
     try {
       if (profile) {
@@ -245,6 +251,46 @@ export default function ProfileScreen() {
                 </View>
               </View>
             )}
+          </View>
+
+          {/* Cycle Length */}
+          <View style={s.section}>
+            <Text style={[s.label, { color: colors.mutedForeground }]}>{t("cycleLengthLabel")}</Text>
+            <Text style={[s.sublabel, { color: colors.mutedForeground }]}>{t("cycleLengthSub")}</Text>
+            <View style={s.chipRow}>
+              {[21,24,25,26,27,28,29,30,32,35,40].map((n) => (
+                <Pressable
+                  key={n}
+                  onPress={() => { Haptics.selectionAsync(); setCycleLength(n); }}
+                  style={[s.chip, {
+                    backgroundColor: cycleLength === n ? colors.primary : colors.card,
+                    borderColor: cycleLength === n ? colors.primary : colors.border,
+                  }]}
+                >
+                  <Text style={[s.chipText, { color: cycleLength === n ? colors.primaryForeground : colors.foreground }]}>{n}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          {/* Period Length */}
+          <View style={s.section}>
+            <Text style={[s.label, { color: colors.mutedForeground }]}>{t("periodLengthLabel")}</Text>
+            <Text style={[s.sublabel, { color: colors.mutedForeground }]}>{t("periodLengthSub")}</Text>
+            <View style={s.chipRow}>
+              {[2,3,4,5,6,7,8].map((n) => (
+                <Pressable
+                  key={n}
+                  onPress={() => { Haptics.selectionAsync(); setPeriodLength(n); }}
+                  style={[s.chip, {
+                    backgroundColor: periodLength === n ? colors.primary : colors.card,
+                    borderColor: periodLength === n ? colors.primary : colors.border,
+                  }]}
+                >
+                  <Text style={[s.chipText, { color: periodLength === n ? colors.primaryForeground : colors.foreground }]}>{n}</Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
 
           {/* Health */}

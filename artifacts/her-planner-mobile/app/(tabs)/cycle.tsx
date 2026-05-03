@@ -20,22 +20,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { PHASE_COLORS, PHASE_EMOJI, SYMPTOM_KEYS } from "@/constants/cycle";
+import { STORAGE_KEYS } from "@/constants/storage";
 
 import type { CreateCycleEntryBodyEntryType } from "@workspace/api-client-react";
 
-const PHASE_COLORS: Record<string, string> = {
-  menstrual: "#e07070", follicular: "#70b070", ovulation: "#d4a843", luteal: "#9b7fc4", unknown: "#b0b0b0",
-};
-const PHASE_EMOJI: Record<string, string> = {
-  menstrual: "🌑", follicular: "🌒", ovulation: "🌕", luteal: "🌖", unknown: "🌙",
-};
-
 function formatEntryDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-function todayKey() {
-  return `today-symptoms-${new Date().toISOString().split("T")[0]}`;
 }
 
 export default function CycleScreen() {
@@ -81,11 +72,7 @@ export default function CycleScreen() {
     { value: "note",         label: t("entryNote")        },
   ];
 
-  const SYMPTOMS_KEYS = [
-    "symCramps","symHeadache","symBloating","symTenderBreasts",
-    "symMoodSwings","symFatigue","symAcne","symCravings",
-  ] as const;
-  const SYMPTOMS = SYMPTOMS_KEYS.map((k) => ({ key: k, label: t(k) }));
+  const SYMPTOMS = SYMPTOM_KEYS.map((k) => ({ key: k, label: t(k) }));
 
   useEffect(() => {
     loadTodaySymptoms();
@@ -93,7 +80,8 @@ export default function CycleScreen() {
 
   async function loadTodaySymptoms() {
     try {
-      const stored = await AsyncStorage.getItem(todayKey());
+      const key = STORAGE_KEYS.todaySymptoms(new Date().toISOString().split("T")[0]!);
+      const stored = await AsyncStorage.getItem(key);
       if (stored) setTodaySymptoms(JSON.parse(stored) as string[]);
     } catch {}
   }
@@ -129,7 +117,8 @@ export default function CycleScreen() {
   async function saveSymptoms() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     try {
-      await AsyncStorage.setItem(todayKey(), JSON.stringify(pickerSymptoms));
+      const key = STORAGE_KEYS.todaySymptoms(new Date().toISOString().split("T")[0]!);
+      await AsyncStorage.setItem(key, JSON.stringify(pickerSymptoms));
       setTodaySymptoms(pickerSymptoms);
       setShowSymptomPicker(false);
     } catch {}

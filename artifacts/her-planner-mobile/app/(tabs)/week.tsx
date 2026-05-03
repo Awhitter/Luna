@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RingChart } from "@/components/RingChart";
 import { useColors } from "@/hooks/useColors";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { PHASE_COLORS, PHASE_EMOJI } from "@/constants/cycle";
 
 const DAY_LETTERS_EN = ["S","M","T","W","T","F","S"];
 
@@ -28,12 +29,6 @@ function getWeekDates(): Date[] {
 
 function toISO(d: Date) { return d.toISOString().split("T")[0]; }
 
-const PHASE_COLORS: Record<string, string> = {
-  menstrual: "#e07070", follicular: "#70b070", ovulation: "#d4a843", luteal: "#9b7fc4", unknown: "#b0b0b0",
-};
-const PHASE_EMOJI: Record<string, string> = {
-  menstrual: "🌑", follicular: "🌒", ovulation: "🌕", luteal: "🌖", unknown: "🌙",
-};
 const CAT_COLORS: Record<string, string> = {
   work: "#c0788a", personal: "#9b7fc4", kids: "#d4a843", health: "#70b070",
   errands: "#d49843", chores: "#7fb8c4", food: "#a87c5f", "self-care": "#c47fbe",

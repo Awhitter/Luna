@@ -207,4 +207,10 @@ export const T: Record<string, TR> = {
   wsFlexible: { en: "Flexible",    es: "Flexible",        pt: "Flexível"       },
   wsRemote:   { en: "Remote",      es: "Remoto",          pt: "Remoto"         },
   wsNone:     { en: "Not working", es: "Sin trabajo",     pt: "Sem trabalho"   },
+
+  cycleLengthLabel: { en: "CYCLE LENGTH", es: "DURACIÓN DEL CICLO", pt: "DURAÇÃO DO CICLO" },
+  cycleLengthSub:   { en: "Average days from period start to next period start", es: "Días promedio de inicio a inicio de período", pt: "Dias médios do início ao próximo período" },
+  periodLengthLabel:{ en: "PERIOD LENGTH", es: "DURACIÓN DEL PERÍODO", pt: "DURAÇÃO DO PERÍODO" },
+  periodLengthSub:  { en: "How many days your period typically lasts", es: "Cuántos días dura tu período normalmente", pt: "Quantos dias seu período normalmente dura" },
+  cycleDays:        { en: "{n} days", es: "{n} días", pt: "{n} dias" },
 };

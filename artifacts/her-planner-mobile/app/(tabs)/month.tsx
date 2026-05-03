@@ -19,16 +19,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { PHASE_COLORS, PHASE_EMOJI } from "@/constants/cycle";
 
-const PHASE_COLORS: Record<string, string> = {
-  menstrual:  "#e07070",
-  follicular: "#70b070",
-  ovulation:  "#d4a843",
-  luteal:     "#9b7fc4",
-};
-const PHASE_EMOJI: Record<string, string> = {
-  menstrual: "🌑", follicular: "🌒", ovulation: "🌕", luteal: "🌖",
-};
 
 const MONTH_NAMES_EN = [
   "January","February","March","April","May","June",
