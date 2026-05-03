@@ -197,7 +197,8 @@ router.post("/openai/conversations/:id/messages", aiRateLimit, async (req, res) 
     const todayData = todayCtx[0];
     const lastPeriod = cyclePhase.find(e => e.entryType === "period_start");
     const pendingTasks = recentTasks.filter(t => !t.completed).slice(0, 5);
-    const systemContext = buildSystemContext(profile, lastPeriod, todayData, pendingTasks, language, symptoms.length > 0 ? symptoms : undefined);
+    const symptomContext = symptoms.length > 0 ? symptoms : (todayData?.symptoms ? [String(todayData.symptoms)] : undefined);
+    const systemContext = buildSystemContext(profile, lastPeriod, todayData, pendingTasks, language, symptomContext);
 
     const history = await db.select().from(messages)
       .where(eq(messages.conversationId, convId))
