@@ -211,6 +211,17 @@ export default function OnboardingScreen() {
                   );
                 })}
               </View>
+
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setPeriodDaysAgo(-1);
+                  animateToStep(2);
+                }}
+                style={s.skipLink}
+              >
+                <Text style={[s.skipLinkText, { color: colors.mutedForeground }]}>{t("onbSkip")}</Text>
+              </Pressable>
             </View>
           )}
 
@@ -333,4 +344,6 @@ const s = StyleSheet.create({
   savingRow:   { flexDirection: "row", alignItems: "center" },
   backBtn:     { alignItems: "center", paddingVertical: 8 },
   backText:    { fontSize: 14, fontFamily: "PlusJakartaSans_500Medium" },
+  skipLink:    { alignItems: "center", paddingVertical: 14, marginTop: 4 },
+  skipLinkText:{ fontSize: 13, fontFamily: "PlusJakartaSans_400Regular" },
 });

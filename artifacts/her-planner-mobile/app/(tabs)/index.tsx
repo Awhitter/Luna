@@ -6,6 +6,7 @@ import {
   useCreateOpenaiConversation,
   useCreateTask,
   useDeleteTask,
+  useGetCheckinStreak,
   useGetCurrentCyclePhase,
   useGetProfile,
   useGetTasksSummary,
@@ -122,6 +123,7 @@ export default function TodayScreen() {
   const createConversation = useCreateOpenaiConversation();
   const createDailyContext = useCreateDailyContext();
   const { data: profile } = useGetProfile();
+  const { data: streak } = useGetCheckinStreak();
   const { data: todayCtx, refetch: refetchCtx } = useGetTodayContext();
   const { data: summary } = useGetTasksSummary();
   const { data: phase } = useGetCurrentCyclePhase();
@@ -321,9 +323,18 @@ export default function TodayScreen() {
           <Text style={[s.dateText, { color: colors.mutedForeground }]}>
             {DAYS[now.getDay()]}, {MONTHS[now.getMonth()]} {now.getDate()}
           </Text>
-          <Text style={[s.greetingText, { color: colors.foreground }]}>
-            {firstName ? `${t("welcomeBack")} ${firstName} 👋` : "Her Planner"}
-          </Text>
+          <View style={s.headerRow}>
+            <Text style={[s.greetingText, { color: colors.foreground, flex: 1 }]}>
+              {firstName ? `${t("welcomeBack")} ${firstName} 👋` : "Her Planner"}
+            </Text>
+            {streak != null && streak.currentStreak > 0 && (
+              <View style={[s.streakBadge, { backgroundColor: colors.primary + "18" }]}>
+                <Text style={[s.streakBadgeText, { color: colors.primary }]}>
+                  {t("streakBadge", { n: String(streak.currentStreak) })}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* ── Check-in card ── */}
@@ -479,6 +490,9 @@ export default function TodayScreen() {
 
       {/* ─── Plan with Luna button ─── */}
       <View style={[s.lunaBar, { paddingBottom: bottomPad + 6, borderTopColor: colors.border, backgroundColor: colors.background }]}>
+        {!todayCtx && (
+          <Text style={[s.lunaNudge, { color: colors.mutedForeground }]}>{t("lunaNudge")}</Text>
+        )}
         <Pressable
           style={[s.lunaBtn, { backgroundColor: colors.primary }]}
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowLuna(true); }}
@@ -874,8 +888,13 @@ const s = StyleSheet.create({
   nextPillLabel: { fontSize: 10, fontFamily: "PlusJakartaSans_500Medium" },
   nextPillDays: { fontSize: 18, fontFamily: "PlusJakartaSans_700Bold", marginTop: 1 },
   phaseExpect: { fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", lineHeight: 19 },
+  // Header
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  streakBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100, flexShrink: 0 },
+  streakBadgeText: { fontSize: 12, fontFamily: "PlusJakartaSans_600SemiBold" },
   // Luna button bar
-  lunaBar: { paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1 },
+  lunaBar: { paddingHorizontal: 16, paddingTop: 10, borderTopWidth: 1 },
+  lunaNudge: { fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", textAlign: "center", lineHeight: 16, marginBottom: 8, paddingHorizontal: 8, fontStyle: "italic" },
   lunaBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16, borderRadius: 16 },
   lunaBtnGlyph: { fontSize: 18, color: "#fff" },
   lunaBtnText: { fontSize: 17, fontFamily: "PlusJakartaSans_700Bold" },

@@ -231,4 +231,8 @@ export const T: Record<string, TR> = {
   onbFinish:        { en: "Let's go!",                    es: "¡Vamos!",                        pt: "Vamos lá!"                       },
   onbSaving:        { en: "Setting up Luna…",             es: "Configurando a Luna…",           pt: "Configurando a Luna…"            },
   onbStep:          { en: "Step {n} of 3",                es: "Paso {n} de 3",                  pt: "Passo {n} de 3"                  },
+  onbSkip:          { en: "Skip this step →",            es: "Omitir este paso →",             pt: "Pular este passo →"              },
+
+  streakBadge:      { en: "🔥 {n}-day streak",            es: "🔥 Racha de {n} días",           pt: "🔥 Sequência de {n} dias"        },
+  lunaNudge:        { en: "The more you check in, the better Luna gets at predicting your moods and helping you plan.", es: "Cuanto más haces check-in, mejor predice Luna tus estados de ánimo y te ayuda a planificar.", pt: "Quanto mais você faz check-in, melhor Luna prevê seus humores e te ajuda a planejar." },
 };
