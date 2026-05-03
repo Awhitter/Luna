@@ -1,27 +1,62 @@
-# Workspace
+# Her Planner
 
-## Overview
+An AI-powered daily life planner for women, featuring Aria — a warm AI best-friend assistant who knows your cycle phase, energy, mood, and daily priorities.
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+## Architecture
 
-## Stack
+### Monorepo Structure
+- `artifacts/her-planner/` — React + Vite frontend (served at `/`)
+- `artifacts/api-server/` — Express API server (served at `/api`)
+- `lib/api-client-react/` — Generated React Query hooks from OpenAPI spec
+- `lib/api-zod/` — Generated Zod validation schemas from OpenAPI spec
+- `lib/api-spec/` — OpenAPI spec (`openapi.yaml`) + codegen config
+- `lib/db/` — Drizzle ORM schema + database connection
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
+### Tech Stack
+- **Frontend**: React 18, Vite, TailwindCSS v4, Wouter routing, TanStack React Query
+- **UI Fonts**: Fraunces (serif headings) + Plus Jakarta Sans (body)
+- **Color Theme**: Warm rose / dusty mauve (`--primary: 345 35% 62%`)
+- **API**: Express.js, Drizzle ORM, PostgreSQL
+- **AI**: OpenAI GPT (via Replit AI Integration), streaming SSE responses
 
-## Key Commands
+## Pages
+- `/` — Today: AI chat with Aria + today's task list + quick check-in
+- `/week` — Week: Tasks organized by category with progress bar
+- `/month` — Month: Calendar with cycle phase color coding + monthly tasks
+- `/cycle` — Cycle Tracker: Current phase card + logging + phase visualization
+- `/settings` — Profile: Onboarding + settings (name, kids, schedule, cycle)
 
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- `pnpm --filter @workspace/api-server run dev` — run API server locally
+## Database Tables
+- `profiles` — User profile (name, hasKids, workSchedule, cycleLength, etc.)
+- `tasks` — Tasks with category, priority, view (today/week/month), completed
+- `cycle_entries` — Period start/end, ovulation, symptoms, notes
+- `daily_contexts` — Daily sleep, energy level (1-10), mood log
+- `conversations` — AI chat conversation sessions
+- `messages` — Chat messages (stored after conversation)
 
-See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+## API Routes
+All routes prefixed with `/api`:
+- `GET/POST/PUT /profile`
+- `GET/POST /tasks`, `GET/PUT/DELETE /tasks/:id`, `GET /tasks/summary`
+- `GET /cycle/entries`, `POST /cycle/entries`, `GET /cycle/current-phase`
+- `GET/POST /daily-context/entries`, `GET /daily-context/today`
+- `GET/POST /openai/conversations`, `GET/DELETE /openai/conversations/:id`
+- `POST /openai/conversations/:id/messages` — SSE streaming endpoint
+- `GET /healthz`
+
+## Key Features
+- **Aria AI Chat**: Streams responses via SSE, knows user's cycle phase, energy, sleep context. Parses `[TASKS:{...}]` blocks for auto task creation.
+- **Cycle Phase Tracking**: Menstrual / Follicular / Ovulation / Luteal with energy/mood/tip cards
+- **Monthly Calendar**: Days color-coded by predicted cycle phase
+- **Daily Check-in**: Sleep hours, energy (1-10), mood logging via bottom sheet modals
+- **Task Management**: Across three views (today/week/month), by category, with completion tracking
+
+## Seed Data
+Initial seed: Sofia (2 kids, 9-5 schedule), cycle started ~10 days ago (Follicular phase), sleep=6.5h, energy=7, mood=motivated, 13 tasks distributed across today/week/month.
+
+## Environment Variables
+- `DATABASE_URL` — PostgreSQL connection string
+- `SESSION_SECRET` — Session secret
+- `PORT` — Assigned per workflow
+- `BASE_PATH` — Assigned per workflow
+- OpenAI key managed via Replit AI Integration

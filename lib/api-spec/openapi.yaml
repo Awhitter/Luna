@@ -3,20 +3,29 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Her Planner API - AI-powered life planner for women
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: profile
+    description: User profile and life context
+  - name: tasks
+    description: Task and checklist management
+  - name: cycle
+    description: Hormonal cycle tracking
+  - name: dailyContext
+    description: Daily context (sleep, energy, mood)
+  - name: openai
+    description: OpenAI AI chat operations
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +33,416 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /profile:
+    get:
+      operationId: getProfile
+      tags: [profile]
+      summary: Get user profile
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "404":
+          description: Profile not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    post:
+      operationId: createProfile
+      tags: [profile]
+      summary: Create user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProfileBody"
+      responses:
+        "201":
+          description: Created profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+    put:
+      operationId: updateProfile
+      tags: [profile]
+      summary: Update user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileBody"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+
+  /tasks:
+    get:
+      operationId: listTasks
+      tags: [tasks]
+      summary: List tasks
+      parameters:
+        - name: view
+          in: query
+          schema:
+            type: string
+            enum: [today, week, month, all]
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: completed
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+    post:
+      operationId: createTask
+      tags: [tasks]
+      summary: Create a new task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskBody"
+      responses:
+        "201":
+          description: Created task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+  /tasks/{id}:
+    get:
+      operationId: getTask
+      tags: [tasks]
+      summary: Get a task by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    put:
+      operationId: updateTask
+      tags: [tasks]
+      summary: Update a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTaskBody"
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    delete:
+      operationId: deleteTask
+      tags: [tasks]
+      summary: Delete a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /tasks/summary:
+    get:
+      operationId: getTasksSummary
+      tags: [tasks]
+      summary: Get task completion summary across views
+      responses:
+        "200":
+          description: Task summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TasksSummary"
+
+  /cycle/entries:
+    get:
+      operationId: listCycleEntries
+      tags: [cycle]
+      summary: List cycle tracking entries
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Cycle entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CycleEntry"
+    post:
+      operationId: createCycleEntry
+      tags: [cycle]
+      summary: Log a cycle entry (period start, ovulation, symptoms)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCycleEntryBody"
+      responses:
+        "201":
+          description: Created cycle entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CycleEntry"
+
+  /cycle/current-phase:
+    get:
+      operationId: getCurrentCyclePhase
+      tags: [cycle]
+      summary: Get current cycle phase and predictions
+      responses:
+        "200":
+          description: Current phase info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CyclePhase"
+
+  /daily-context:
+    get:
+      operationId: listDailyContexts
+      tags: [dailyContext]
+      summary: List daily context entries
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Daily contexts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DailyContext"
+    post:
+      operationId: createDailyContext
+      tags: [dailyContext]
+      summary: Log today's context (sleep, energy, mood)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDailyContextBody"
+      responses:
+        "201":
+          description: Created daily context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyContext"
+
+  /daily-context/today:
+    get:
+      operationId: getTodayContext
+      tags: [dailyContext]
+      summary: Get today's context entry
+      responses:
+        "200":
+          description: Today's context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyContext"
+        "404":
+          description: No entry for today
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /openai/conversations:
+    get:
+      operationId: listOpenaiConversations
+      tags: [openai]
+      summary: List all conversations
+      responses:
+        "200":
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpenaiConversation"
+    post:
+      operationId: createOpenaiConversation
+      tags: [openai]
+      summary: Create a new conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOpenaiConversationBody"
+      responses:
+        "201":
+          description: Created conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenaiConversation"
+
+  /openai/conversations/{id}:
+    get:
+      operationId: getOpenaiConversation
+      tags: [openai]
+      summary: Get conversation with messages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Conversation with messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenaiConversationWithMessages"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenaiError"
+    delete:
+      operationId: deleteOpenaiConversation
+      tags: [openai]
+      summary: Delete a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenaiError"
+
+  /openai/conversations/{id}/messages:
+    get:
+      operationId: listOpenaiMessages
+      tags: [openai]
+      summary: List messages in a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpenaiMessage"
+    post:
+      operationId: sendOpenaiMessage
+      tags: [openai]
+      summary: Send a text message and receive a streaming text response
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendOpenaiMessageBody"
+      responses:
+        "200":
+          description: SSE stream of assistant text chunks
+          content:
+            text/event-stream: {}
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +453,451 @@ components:
       required:
         - status
 
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    Profile:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        hasKids:
+          type: boolean
+        numberOfKids:
+          type: integer
+          nullable: true
+        workSchedule:
+          type: string
+          nullable: true
+        healthConditions:
+          type: string
+          nullable: true
+        averageSleepHours:
+          type: number
+          nullable: true
+        cycleLength:
+          type: integer
+          nullable: true
+        periodLength:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - hasKids
+        - createdAt
+        - updatedAt
+
+    CreateProfileBody:
+      type: object
+      properties:
+        name:
+          type: string
+        hasKids:
+          type: boolean
+        numberOfKids:
+          type: integer
+          nullable: true
+        workSchedule:
+          type: string
+          nullable: true
+        healthConditions:
+          type: string
+          nullable: true
+        averageSleepHours:
+          type: number
+          nullable: true
+        cycleLength:
+          type: integer
+          nullable: true
+        periodLength:
+          type: integer
+          nullable: true
+      required:
+        - name
+        - hasKids
+
+    UpdateProfileBody:
+      type: object
+      properties:
+        name:
+          type: string
+        hasKids:
+          type: boolean
+        numberOfKids:
+          type: integer
+          nullable: true
+        workSchedule:
+          type: string
+          nullable: true
+        healthConditions:
+          type: string
+          nullable: true
+        averageSleepHours:
+          type: number
+          nullable: true
+        cycleLength:
+          type: integer
+          nullable: true
+        periodLength:
+          type: integer
+          nullable: true
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        category:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high]
+        completed:
+          type: boolean
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+        view:
+          type: string
+          enum: [today, week, month]
+        aiSuggested:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - category
+        - priority
+        - completed
+        - view
+        - aiSuggested
+        - createdAt
+        - updatedAt
+
+    CreateTaskBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        category:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high]
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+        view:
+          type: string
+          enum: [today, week, month]
+        aiSuggested:
+          type: boolean
+      required:
+        - title
+        - category
+        - priority
+        - view
+
+    UpdateTaskBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        category:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high]
+        completed:
+          type: boolean
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+        view:
+          type: string
+          enum: [today, week, month]
+
+    TasksSummary:
+      type: object
+      properties:
+        today:
+          type: object
+          properties:
+            total:
+              type: integer
+            completed:
+              type: integer
+          required:
+            - total
+            - completed
+        week:
+          type: object
+          properties:
+            total:
+              type: integer
+            completed:
+              type: integer
+          required:
+            - total
+            - completed
+        month:
+          type: object
+          properties:
+            total:
+              type: integer
+            completed:
+              type: integer
+          required:
+            - total
+            - completed
+        byCategory:
+          type: array
+          items:
+            type: object
+            properties:
+              category:
+                type: string
+              total:
+                type: integer
+              completed:
+                type: integer
+            required:
+              - category
+              - total
+              - completed
+      required:
+        - today
+        - week
+        - month
+        - byCategory
+
+    CycleEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        entryType:
+          type: string
+          enum: [period_start, period_end, ovulation, symptom, note]
+        date:
+          type: string
+          format: date
+        symptoms:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - entryType
+        - date
+        - createdAt
+
+    CreateCycleEntryBody:
+      type: object
+      properties:
+        entryType:
+          type: string
+          enum: [period_start, period_end, ovulation, symptom, note]
+        date:
+          type: string
+          format: date
+        symptoms:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+      required:
+        - entryType
+        - date
+
+    CyclePhase:
+      type: object
+      properties:
+        phase:
+          type: string
+          enum: [menstrual, follicular, ovulation, luteal, unknown]
+        dayInCycle:
+          type: integer
+          nullable: true
+        nextPeriodIn:
+          type: integer
+          nullable: true
+        energyExpectation:
+          type: string
+        moodExpectation:
+          type: string
+        recommendation:
+          type: string
+      required:
+        - phase
+        - energyExpectation
+        - moodExpectation
+        - recommendation
+
+    DailyContext:
+      type: object
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+          format: date
+        sleepHours:
+          type: number
+          nullable: true
+        energyLevel:
+          type: integer
+          nullable: true
+        mood:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - date
+        - createdAt
+
+    CreateDailyContextBody:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        sleepHours:
+          type: number
+          nullable: true
+        energyLevel:
+          type: integer
+          nullable: true
+        mood:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+      required:
+        - date
+
+    OpenaiConversation:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - createdAt
+
+    OpenaiMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        conversationId:
+          type: integer
+        role:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - conversationId
+        - role
+        - content
+        - createdAt
+
+    CreateOpenaiConversationBody:
+      type: object
+      properties:
+        title:
+          type: string
+      required:
+        - title
+
+    SendOpenaiMessageBody:
+      type: object
+      properties:
+        content:
+          type: string
+      required:
+        - content
+
+    OpenaiConversationWithMessages:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpenaiMessage"
+      required:
+        - id
+        - title
+        - createdAt
+        - messages
+
+    OpenaiError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
