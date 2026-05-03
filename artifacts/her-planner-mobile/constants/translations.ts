@@ -65,6 +65,11 @@ export const T: Record<string, TR> = {
   checkinSleep:   { en: "Sleep",          es: "Sueño",          pt: "Sono"             },
   checkinLater:   { en: "Later",          es: "Después",        pt: "Depois"           },
   checkinSave:    { en: "Save",           es: "Guardar",        pt: "Salvar"           },
+  addAnotherSymptom: { en: "Add another symptom", es: "Agregar otro síntoma", pt: "Adicionar outro sintoma" },
+  customSymptomPh: { en: "Type exactly how you feel…", es: "Escribe exactamente cómo te sientes…", pt: "Digite exatamente como você se sente…" },
+  addSymptomConfirmTitle: { en: "Add this symptom?", es: "¿Agregar este síntoma?", pt: "Adicionar este sintoma?" },
+  addSymptomConfirmBody: { en: "I hear you feel {symptom}. Should I add it to today's symptoms?", es: "Entiendo que te sientes {symptom}. ¿Lo agrego a los síntomas de hoy?", pt: "Entendo que você está {symptom}. Posso adicionar aos sintomas de hoje?" },
+  yesAddIt: { en: "Yes, add it", es: "Sí, agrégalo", pt: "Sim, adicione" },
 
   moodAwful: { en: "Awful",  es: "Pésimo", pt: "Péssimo" },
   moodBad:   { en: "Bad",    es: "Malo",   pt: "Ruim"    },

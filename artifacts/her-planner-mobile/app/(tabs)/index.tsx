@@ -112,6 +112,9 @@ export default function TodayScreen() {
   const [showTyping, setShowTyping] = useState(false);
   const [showTasks, setShowTasks] = useState(false);
   const [addedTasks, setAddedTasks] = useState<Set<string>>(new Set());
+  const [customSymptom, setCustomSymptom] = useState("");
+  const [pendingSymptomText, setPendingSymptomText] = useState("");
+  const [showSymptomConfirm, setShowSymptomConfirm] = useState(false);
 
   const [checkinMood, setCheckinMood] = useState(0);
   const [checkinEnergy, setCheckinEnergy] = useState(0);
@@ -194,8 +197,30 @@ export default function TodayScreen() {
   async function handleSend() {
     const text = inputText.trim();
     if (!text || isStreaming || !conversationId) return;
+    const symptomMatch = text.match(/\b(?:i[' ]?m|i am|feeling|feel|i feel)\s+(.+?)[.!?]*$/i);
+    if (symptomMatch?.[1]) {
+      const symptom = symptomMatch[1].trim();
+      if (symptom) {
+        setPendingSymptomText(symptom);
+        setShowSymptomConfirm(true);
+        return;
+      }
+    }
     setInputText("");
     await sendMessage(text);
+  }
+
+  async function confirmLunaSymptom() {
+    const symptom = pendingSymptomText.trim();
+    if (!symptom) return;
+    const next = Array.from(new Set([...todaySymptoms, symptom]));
+    const key = STORAGE_KEYS.todaySymptoms(today);
+    await AsyncStorage.setItem(key, JSON.stringify(next));
+    setTodaySymptoms(next);
+    setShowSymptomConfirm(false);
+    setPendingSymptomText("");
+    setInputText("");
+    await sendMessage(`I hear you feel ${symptom}. I'll add it to today's symptoms.`);
   }
 
   async function sendMessage(text: string) {
@@ -584,6 +609,22 @@ export default function TodayScreen() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+      <Modal visible={showSymptomConfirm} transparent animationType="fade" onRequestClose={() => setShowSymptomConfirm(false)}>
+        <View style={s.confirmOverlay}>
+          <View style={[s.confirmCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[s.confirmTitle, { color: colors.foreground }]}>{t("addSymptomConfirmTitle")}</Text>
+            <Text style={[s.confirmBody, { color: colors.mutedForeground }]}>{t("addSymptomConfirmBody", { symptom: pendingSymptomText })}</Text>
+            <View style={s.confirmRow}>
+              <Pressable onPress={() => setShowSymptomConfirm(false)} style={[s.confirmBtn, { borderColor: colors.border }]}>
+                <Text style={[s.confirmBtnText, { color: colors.mutedForeground }]}>{t("cancel")}</Text>
+              </Pressable>
+              <Pressable onPress={() => { void confirmLunaSymptom(); }} style={[s.confirmBtn, { backgroundColor: colors.primary }]}>
+                <Text style={[s.confirmBtnText, { color: colors.primaryForeground }]}>{t("yesAddIt")}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* ─── Tasks Modal ─── */}
       <Modal visible={showTasks} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowTasks(false)}>
@@ -694,7 +735,25 @@ function CheckinExpanded({
               </Pressable>
             );
           })}
+          <Pressable
+            onPress={() => {
+              const next = customSymptom.trim();
+              if (!next) return;
+              onSymptoms(symptoms.includes(next) ? symptoms : [...symptoms, next]);
+              setCustomSymptom("");
+            }}
+            style={[ce.symChip, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}
+          >
+            <Text style={[ce.symChipText, { color: colors.foreground }]}>{t("addAnotherSymptom")}</Text>
+          </Pressable>
         </View>
+        <TextInput
+          value={customSymptom}
+          onChangeText={setCustomSymptom}
+          placeholder={t("customSymptomPh")}
+          placeholderTextColor={colors.mutedForeground}
+          style={[ce.customSymptomInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+        />
       </View>
       <View style={ce.saveRow}>
         <Pressable onPress={onClose} style={[ce.skipBtn, { borderColor: colors.border }]}>
@@ -982,6 +1041,7 @@ const ce = StyleSheet.create({
   skipTxt: { fontSize: 13, fontFamily: "PlusJakartaSans_500Medium" },
   saveBtn: { flex: 2, paddingVertical: 10, borderRadius: 12, alignItems: "center" },
   saveTxt: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold" },
+  customSymptomInput: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginTop: 8, fontSize: 14, fontFamily: "PlusJakartaSans_400Regular" },
   symChips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   symChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 100 },
   symChipText: { fontSize: 12, fontFamily: "PlusJakartaSans_500Medium" },
