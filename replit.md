@@ -1,11 +1,12 @@
 # Her Planner
 
-An AI-powered daily life planner for women, featuring Aria — a warm AI best-friend assistant who knows your cycle phase, energy, mood, and daily priorities.
+An AI-powered daily life planner for women, featuring Luna — a warm AI assistant who knows your cycle phase, energy, mood, and daily priorities.
 
 ## Architecture
 
 ### Monorepo Structure
 - `artifacts/her-planner/` — React + Vite frontend (served at `/`)
+- `artifacts/her-planner-mobile/` — Expo React Native mobile app (served at `/mobile/`, iOS/Android via Expo Go QR)
 - `artifacts/api-server/` — Express API server (served at `/api`)
 - `lib/api-client-react/` — Generated React Query hooks from OpenAPI spec
 - `lib/api-zod/` — Generated Zod validation schemas from OpenAPI spec
@@ -13,9 +14,10 @@ An AI-powered daily life planner for women, featuring Aria — a warm AI best-fr
 - `lib/db/` — Drizzle ORM schema + database connection
 
 ### Tech Stack
-- **Frontend**: React 18, Vite, TailwindCSS v4, Wouter routing, TanStack React Query
-- **UI Fonts**: Fraunces (serif headings) + Plus Jakarta Sans (body)
-- **Color Theme**: Warm rose / dusty mauve (`--primary: 345 35% 62%`)
+- **Web Frontend**: React 18, Vite, TailwindCSS v4, Wouter routing, TanStack React Query
+- **Mobile**: Expo SDK 54 (React Native), expo-router tabs, NativeTabs (iOS 26 liquid glass), @expo-google-fonts/plus-jakarta-sans
+- **UI Fonts**: Fraunces (serif headings, web) + Plus Jakarta Sans (body, both platforms)
+- **Color Theme**: Warm rose / dusty mauve (`--primary: 345 35% 62%` / `#c0788a`)
 - **API**: Express.js, Drizzle ORM, PostgreSQL
 - **AI**: OpenAI GPT (via Replit AI Integration), streaming SSE responses
 

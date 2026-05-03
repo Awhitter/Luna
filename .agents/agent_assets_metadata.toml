@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "rHJUuH6i_Yxky-YwXYzel"
+uri = "file://artifacts/her-planner-mobile/assets/images/icon.png"
+type = "image"
+title = "generated_image"
