@@ -42,6 +42,9 @@ const CAT_KEYS: Record<string, string> = {
   work: "catWork", personal: "catPersonal", kids: "catKids", health: "catHealth",
   errands: "catErrands", chores: "catChores", food: "catFood", "self-care": "catSelfCare",
 };
+const MOOD_EMOJI_MAP: Record<string, string> = {
+  happy: "😊", calm: "😌", tired: "😴", anxious: "😟", sad: "😢", energetic: "⚡", irritable: "😠", focused: "🎯",
+};
 
 export default function WeekScreen() {
   const colors = useColors();
@@ -60,10 +63,24 @@ export default function WeekScreen() {
   const { data: contexts } = useListDailyContexts({ limit: 7 });
 
   const contextByDate = React.useMemo(() => {
-    const map: Record<string, { energy?: number | null }> = {};
-    if (contexts) for (const ctx of contexts) map[ctx.date] = { energy: ctx.energyLevel };
+    const map: Record<string, { energy?: number | null; sleep?: number | null; mood?: string | null }> = {};
+    if (contexts) for (const ctx of contexts) map[ctx.date] = { energy: ctx.energyLevel, sleep: ctx.sleepHours, mood: ctx.mood };
     return map;
   }, [contexts]);
+
+  const weeklySummary = React.useMemo(() => {
+    const entries = weekDates.map((d) => contextByDate[toISO(d)]).filter(Boolean);
+    const tracked = entries.length;
+    const energyVals = entries.map((e) => e?.energy).filter((v): v is number => v != null);
+    const sleepVals  = entries.map((e) => e?.sleep).filter((v): v is number => v != null);
+    const moods      = entries.map((e) => e?.mood).filter((v): v is string => !!v);
+    const avgEnergy  = energyVals.length > 0 ? energyVals.reduce((a, b) => a + b, 0) / energyVals.length : null;
+    const avgSleep   = sleepVals.length > 0  ? sleepVals.reduce((a, b) => a + b, 0)  / sleepVals.length  : null;
+    const moodFreq: Record<string, number> = {};
+    for (const m of moods) moodFreq[m] = (moodFreq[m] ?? 0) + 1;
+    const topMood = moods.length > 0 ? Object.entries(moodFreq).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null : null;
+    return { tracked, avgEnergy, avgSleep, topMood };
+  }, [contextByDate, weekDates]);
 
   type TaskArr = NonNullable<typeof tasks>;
   const tasksByCategory = React.useMemo(() => {
@@ -87,6 +104,45 @@ export default function WeekScreen() {
       showsVerticalScrollIndicator={false}
     >
       <Text style={[s.heading, { color: colors.foreground, paddingHorizontal: 20 }]}>{t("thisWeek")}</Text>
+
+      {/* Weekly Wellness Summary Strip */}
+      {weeklySummary.tracked > 0 && (
+        <View style={[s.wellnessStrip, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[s.cardTitle, { color: colors.foreground, marginBottom: 12 }]}>{t("weekWellness")}</Text>
+          <View style={s.wellnessRow}>
+            {/* Days tracked */}
+            <View style={[s.wellnessTile, { backgroundColor: colors.primary + "18" }]}>
+              <Text style={s.wellnessTileValue}>{weeklySummary.tracked}</Text>
+              <Text style={[s.wellnessTileLabel, { color: colors.mutedForeground }]}>{t("daysTracked")}</Text>
+            </View>
+            {/* Avg energy */}
+            {weeklySummary.avgEnergy != null && (
+              <View style={[s.wellnessTile, { backgroundColor: "#d4a84318" }]}>
+                <Text style={[s.wellnessTileValue, { color: "#b8891a" }]}>
+                  ⚡ {weeklySummary.avgEnergy.toFixed(1)}<Text style={s.wellnessTileUnit}>/5</Text>
+                </Text>
+                <Text style={[s.wellnessTileLabel, { color: colors.mutedForeground }]}>{t("avgEnergy")}</Text>
+              </View>
+            )}
+            {/* Avg sleep */}
+            {weeklySummary.avgSleep != null && (
+              <View style={[s.wellnessTile, { backgroundColor: "#9b7fc418" }]}>
+                <Text style={[s.wellnessTileValue, { color: "#7b5fa4" }]}>
+                  😴 {weeklySummary.avgSleep.toFixed(1)}<Text style={s.wellnessTileUnit}>h</Text>
+                </Text>
+                <Text style={[s.wellnessTileLabel, { color: colors.mutedForeground }]}>{t("avgSleep")}</Text>
+              </View>
+            )}
+            {/* Top mood */}
+            {weeklySummary.topMood && (
+              <View style={[s.wellnessTile, { backgroundColor: "#70b07018" }]}>
+                <Text style={s.wellnessTileEmoji}>{MOOD_EMOJI_MAP[weeklySummary.topMood] ?? "😐"}</Text>
+                <Text style={[s.wellnessTileLabel, { color: colors.mutedForeground }]}>{t("topMood")}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
 
       {/* Rings */}
       <View style={[s.ringCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -214,4 +270,13 @@ const s = StyleSheet.create({
   catTrack: { height: 6, borderRadius: 3, overflow: "hidden" },
   catFill: { height: 6, borderRadius: 3 },
   loading: { paddingVertical: 24, alignItems: "center" },
+  wellnessStrip: { marginHorizontal: 16, marginBottom: 14, borderRadius: 18, borderWidth: 1, padding: 16 },
+  wellnessRow: { flexDirection: "row", gap: 8 },
+  wellnessTile: {
+    flex: 1, borderRadius: 14, padding: 10, alignItems: "center", justifyContent: "center", minHeight: 64,
+  },
+  wellnessTileValue: { fontSize: 16, fontFamily: "PlusJakartaSans_700Bold", color: "#c0788a" },
+  wellnessTileUnit: { fontSize: 11, fontFamily: "PlusJakartaSans_400Regular" },
+  wellnessTileEmoji: { fontSize: 22, lineHeight: 28 },
+  wellnessTileLabel: { fontSize: 9, fontFamily: "PlusJakartaSans_500Medium", textAlign: "center", marginTop: 3, textTransform: "uppercase", letterSpacing: 0.4 },
 });

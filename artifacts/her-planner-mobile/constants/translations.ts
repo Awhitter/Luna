@@ -111,6 +111,11 @@ export const T: Record<string, TR> = {
   weekAtGlance: { en: "Week at a glance",              es: "Semana de un vistazo",         pt: "Semana em resumo"               },
   energyLogged: { en: "Energy levels logged this week",es: "Niveles de energía esta semana", pt: "Níveis de energia esta semana"},
   byCategory:   { en: "By Category",                  es: "Por Categoría",                pt: "Por Categoria"                  },
+  weekWellness: { en: "Weekly Wellness",               es: "Bienestar Semanal",            pt: "Bem-estar Semanal"              },
+  avgEnergy:    { en: "avg energy",                   es: "energía prom.",                pt: "energia méd."                   },
+  avgSleep:     { en: "avg sleep",                    es: "sueño prom.",                  pt: "sono méd."                      },
+  topMood:      { en: "top mood",                     es: "estado frecuente",             pt: "humor frequente"                },
+  daysTracked:  { en: "days tracked",                 es: "días registrados",             pt: "dias registrados"               },
 
   catWork:    { en: "Work",     es: "Trabajo",          pt: "Trabalho"          },
   catPersonal:{ en: "Personal", es: "Personal",         pt: "Pessoal"           },
