@@ -1,10 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
+  Task,
+  TasksSummary,
   useCreateDailyContext,
   useCreateOpenaiConversation,
   useCreateTask,
   useDeleteTask,
   useGetCurrentCyclePhase,
+  useGetProfile,
   useGetTasksSummary,
   useGetTodayContext,
   useListTasks,
@@ -15,7 +18,6 @@ import { fetch } from "expo/fetch";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
   FlatList,
   Modal,
   Platform,
@@ -32,11 +34,19 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RingChart } from "@/components/RingChart";
 import { useColors } from "@/hooks/useColors";
 
+interface SuggestedTask {
+  title: string;
+  category: string;
+  priority: string;
+  view: string;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   ts: number;
+  suggestedTasks?: SuggestedTask[];
 }
 
 let msgCounter = 0;
@@ -47,23 +57,14 @@ function uid(): string {
 
 let convInitLock = false;
 
-const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 const PHASE_EMOJI: Record<string, string> = {
-  menstrual: "🌑",
-  follicular: "🌒",
-  ovulation: "🌕",
-  luteal: "🌖",
-  unknown: "🌙",
+  menstrual: "🌑", follicular: "🌒", ovulation: "🌕", luteal: "🌖", unknown: "🌙",
 };
-
 const PHASE_LABEL: Record<string, string> = {
-  menstrual: "Menstrual",
-  follicular: "Follicular",
-  ovulation: "Ovulation",
-  luteal: "Luteal",
-  unknown: "Cycle",
+  menstrual: "Menstrual", follicular: "Follicular", ovulation: "Ovulation", luteal: "Luteal", unknown: "Cycle",
 };
 
 const MOOD_LABELS = ["", "Awful", "Bad", "Okay", "Good", "Great"];
@@ -73,6 +74,21 @@ const SLEEP_OPTIONS = [5, 6, 7, 8, 9];
 function formatTime(ts: number) {
   const d = new Date(ts);
   return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+}
+
+function parseTasks(content: string): { displayText: string; tasks: SuggestedTask[] } {
+  const taskRegex = /\[TASKS:(\{.*?\})\]/s;
+  const match = content.match(taskRegex);
+  if (!match?.[1]) return { displayText: content, tasks: [] };
+  try {
+    const parsed = JSON.parse(match[1]) as { tasks?: SuggestedTask[] };
+    return {
+      displayText: content.replace(taskRegex, "").trim(),
+      tasks: parsed.tasks ?? [],
+    };
+  } catch {
+    return { displayText: content.replace(taskRegex, "").trim(), tasks: [] };
+  }
 }
 
 export default function TodayScreen() {
@@ -89,18 +105,18 @@ export default function TodayScreen() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [showTyping, setShowTyping] = useState(false);
   const [showTasks, setShowTasks] = useState(false);
+  const [addedTasks, setAddedTasks] = useState<Set<string>>(new Set());
 
   const [checkinMood, setCheckinMood] = useState(0);
   const [checkinEnergy, setCheckinEnergy] = useState(0);
   const [checkinSleep, setCheckinSleep] = useState(7);
   const [checkinExpanded, setCheckinExpanded] = useState(false);
-
   const [newTaskText, setNewTaskText] = useState("");
   const initialized = useRef(false);
-  const typingAnim = useRef(new Animated.Value(0)).current;
 
   const createConversation = useCreateOpenaiConversation();
   const createDailyContext = useCreateDailyContext();
+  const { data: profile } = useGetProfile();
   const { data: todayCtx, refetch: refetchCtx } = useGetTodayContext();
   const { data: summary } = useGetTasksSummary();
   const { data: phase } = useGetCurrentCyclePhase();
@@ -112,26 +128,13 @@ export default function TodayScreen() {
   const today = new Date().toISOString().split("T")[0];
   const now = new Date();
   const checkinNeeded = !todayCtx;
+  const firstName = profile?.name?.split(" ")[0] ?? "";
 
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
     initConversation();
   }, []);
-
-  useEffect(() => {
-    if (showTyping) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(typingAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-          Animated.timing(typingAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
-        ])
-      ).start();
-    } else {
-      typingAnim.stopAnimation();
-      typingAnim.setValue(0);
-    }
-  }, [showTyping]);
 
   async function initConversation() {
     if (convInitLock) return;
@@ -179,6 +182,7 @@ export default function TodayScreen() {
     setShowTyping(true);
 
     let fullContent = "";
+    let assistantId = uid();
     let assistantAdded = false;
 
     try {
@@ -212,18 +216,20 @@ export default function TodayScreen() {
               fullContent += parsed.content;
               if (!assistantAdded) {
                 setShowTyping(false);
+                const { displayText, tasks: st } = parseTasks(fullContent);
                 setMessages((prev) => [
                   ...prev,
-                  { id: uid(), role: "assistant", content: fullContent, ts: Date.now() },
+                  { id: assistantId, role: "assistant", content: displayText, ts: Date.now(), suggestedTasks: st },
                 ]);
                 assistantAdded = true;
               } else {
+                const { displayText, tasks: st } = parseTasks(fullContent);
                 setMessages((prev) => {
                   const updated = [...prev];
-                  updated[updated.length - 1] = {
-                    ...updated[updated.length - 1],
-                    content: fullContent,
-                  };
+                  const last = updated[updated.length - 1];
+                  if (last && last.id === assistantId) {
+                    updated[updated.length - 1] = { ...last, content: displayText, suggestedTasks: st };
+                  }
                   return updated;
                 });
               }
@@ -243,6 +249,24 @@ export default function TodayScreen() {
     }
 
     setTimeout(() => inputRef.current?.focus(), 80);
+  }
+
+  async function handleAddSuggestedTask(msgId: string, task: SuggestedTask) {
+    const key = `${msgId}-${task.title}`;
+    if (addedTasks.has(key)) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await createTask.mutateAsync({
+        data: {
+          title: task.title,
+          category: task.category as Task["category"],
+          priority: task.priority as Task["priority"],
+          view: task.view as Task["view"],
+        },
+      });
+      setAddedTasks((prev) => new Set([...prev, key]));
+      refetchTasks();
+    } catch {}
   }
 
   async function toggleTask(id: number, completed: boolean) {
@@ -272,238 +296,194 @@ export default function TodayScreen() {
     } catch {}
   }
 
-  const reversed = [...messages].reverse();
   const phaseKey = phase?.phase ?? "unknown";
+  const reversed = [...messages].reverse();
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
 
-      {/* ─── Header ─── */}
-      <View style={[s.header, { paddingTop: topPad + 12, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <View style={s.headerTopRow}>
-          <View>
-            <Text style={[s.headerDay, { color: colors.mutedForeground }]}>
-              {DAYS[now.getDay()]}, {MONTHS[now.getMonth()]} {now.getDate()}
-            </Text>
-            <Text style={[s.headerTitle, { color: colors.foreground }]}>Luna</Text>
+      {/* ─── Compact Header ─── */}
+      <View style={[s.header, { paddingTop: topPad + 10, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+
+        {/* Welcome row */}
+        <View style={s.welcomeRow}>
+          <View style={{ flex: 1 }}>
+            {firstName ? (
+              <>
+                <Text style={[s.welcomeLine, { color: colors.mutedForeground }]}>
+                  {DAYS[now.getDay()]}, {MONTHS[now.getMonth()]} {now.getDate()}
+                </Text>
+                <Text style={[s.welcomeName, { color: colors.foreground }]}>
+                  Welcome back, {firstName} 👋
+                </Text>
+              </>
+            ) : (
+              <Text style={[s.welcomeName, { color: colors.foreground }]}>Her Planner</Text>
+            )}
           </View>
-          <View style={s.headerRight}>
-            <Pressable
-              onPress={() => setShowTasks(true)}
-              style={[s.pillBtn, { backgroundColor: colors.muted }]}
-            >
-              <Text style={[s.pillBtnText, { color: colors.foreground }]}>Tasks</Text>
-            </Pressable>
+          <Pressable
+            onPress={() => setShowTasks(true)}
+            style={[s.tasksBtn, { backgroundColor: colors.primary }]}
+          >
+            <Text style={[s.tasksBtnText, { color: colors.primaryForeground }]}>Tasks</Text>
+          </Pressable>
+        </View>
+
+        {/* Compact rings + phase info in one row */}
+        <View style={[s.statsRow, { borderTopColor: colors.border }]}>
+          <View style={s.miniRingGroup}>
+            <RingChart
+              completed={summary?.today?.completed ?? 0}
+              total={summary?.today?.total ?? 0}
+              size={56}
+              strokeWidth={5}
+              color={colors.primary}
+              bgColor={colors.muted}
+              label="Today"
+              labelColor={colors.foreground}
+              mutedColor={colors.mutedForeground}
+            />
+            <RingChart
+              completed={summary?.week?.completed ?? 0}
+              total={summary?.week?.total ?? 0}
+              size={56}
+              strokeWidth={5}
+              color="#9b7fc4"
+              bgColor={colors.muted}
+              label="Week"
+              labelColor={colors.foreground}
+              mutedColor={colors.mutedForeground}
+            />
+            <RingChart
+              completed={summary?.month?.completed ?? 0}
+              total={summary?.month?.total ?? 0}
+              size={56}
+              strokeWidth={5}
+              color="#d4a843"
+              bgColor={colors.muted}
+              label="Month"
+              labelColor={colors.foreground}
+              mutedColor={colors.mutedForeground}
+            />
+          </View>
+
+          <View style={[s.divV, { backgroundColor: colors.border }]} />
+
+          {/* Phase + context info stack */}
+          <View style={s.contextStack}>
+            <View style={[s.phasePill, { backgroundColor: colors.accent }]}>
+              <Text style={s.pillEmoji}>{PHASE_EMOJI[phaseKey]}</Text>
+              <Text style={[s.pillText, { color: colors.foreground }]}>
+                {PHASE_LABEL[phaseKey]}
+                {phase?.dayInCycle != null ? ` · D${phase.dayInCycle}` : ""}
+              </Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 5 }}>
+              <View style={s.ctxChips}>
+                {todayCtx?.energyLevel != null && (
+                  <View style={[s.ctxChip, { backgroundColor: colors.muted }]}>
+                    <Text style={[s.ctxChipTxt, { color: colors.mutedForeground }]}>⚡ {todayCtx.energyLevel}/5</Text>
+                  </View>
+                )}
+                {todayCtx?.sleepHours != null && (
+                  <View style={[s.ctxChip, { backgroundColor: colors.muted }]}>
+                    <Text style={[s.ctxChipTxt, { color: colors.mutedForeground }]}>😴 {todayCtx.sleepHours}h</Text>
+                  </View>
+                )}
+                {phase?.nextPeriodIn != null && (
+                  <View style={[s.ctxChip, { backgroundColor: colors.muted }]}>
+                    <Text style={[s.ctxChipTxt, { color: colors.mutedForeground }]}>📅 {phase.nextPeriodIn}d</Text>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
           </View>
         </View>
 
-        {/* Phase + context chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.chipsRow}
-        >
-          <View style={[s.chip, { backgroundColor: colors.accent }]}>
-            <Text style={s.chipEmoji}>{PHASE_EMOJI[phaseKey]}</Text>
-            <Text style={[s.chipText, { color: colors.foreground }]}>
-              {PHASE_LABEL[phaseKey]}
-              {phase?.dayInCycle != null ? ` · Day ${phase.dayInCycle}` : ""}
-            </Text>
+        {/* Inline check-in */}
+        {checkinNeeded && (
+          <View style={[s.checkinBanner, { borderTopColor: colors.border }]}>
+            {!checkinExpanded ? (
+              <Pressable
+                style={s.checkinBannerInner}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCheckinExpanded(true); }}
+              >
+                <Text style={[s.checkinBannerText, { color: colors.mutedForeground }]}>
+                  ☀️  Morning check-in — how are you today?
+                </Text>
+                <View style={[s.checkinBannerBtn, { backgroundColor: colors.primary }]}>
+                  <Text style={[s.checkinBannerBtnTxt, { color: colors.primaryForeground }]}>Start</Text>
+                </View>
+              </Pressable>
+            ) : (
+              <CheckinExpanded
+                mood={checkinMood}
+                energy={checkinEnergy}
+                sleep={checkinSleep}
+                onMood={setCheckinMood}
+                onEnergy={setCheckinEnergy}
+                onSleep={setCheckinSleep}
+                onSave={handleWizardSave}
+                onClose={() => setCheckinExpanded(false)}
+                isPending={createDailyContext.isPending}
+                colors={colors}
+              />
+            )}
           </View>
-          {todayCtx?.energyLevel != null && (
-            <View style={[s.chip, { backgroundColor: colors.accent }]}>
-              <Text style={s.chipEmoji}>⚡</Text>
-              <Text style={[s.chipText, { color: colors.foreground }]}>Energy {todayCtx.energyLevel}/5</Text>
-            </View>
-          )}
-          {todayCtx?.sleepHours != null && (
-            <View style={[s.chip, { backgroundColor: colors.accent }]}>
-              <Text style={s.chipEmoji}>😴</Text>
-              <Text style={[s.chipText, { color: colors.foreground }]}>{todayCtx.sleepHours}h sleep</Text>
-            </View>
-          )}
-          {todayCtx?.mood && (
-            <View style={[s.chip, { backgroundColor: colors.accent }]}>
-              <Text style={s.chipEmoji}>✨</Text>
-              <Text style={[s.chipText, { color: colors.foreground }]}>{todayCtx.mood}</Text>
-            </View>
-          )}
-          {phase?.nextPeriodIn != null && (
-            <View style={[s.chip, { backgroundColor: colors.accent }]}>
-              <Text style={s.chipEmoji}>📅</Text>
-              <Text style={[s.chipText, { color: colors.foreground }]}>Period in {phase.nextPeriodIn}d</Text>
-            </View>
-          )}
-        </ScrollView>
-
-        {/* Ring charts */}
-        <View style={[s.ringsRow, { borderTopColor: colors.border }]}>
-          <RingChart
-            completed={summary?.today?.completed ?? 0}
-            total={summary?.today?.total ?? 0}
-            size={72}
-            strokeWidth={6}
-            color={colors.primary}
-            bgColor={colors.muted}
-            label="Today"
-            labelColor={colors.foreground}
-            mutedColor={colors.mutedForeground}
-          />
-          <View style={[s.ringDivider, { backgroundColor: colors.border }]} />
-          <RingChart
-            completed={summary?.week?.completed ?? 0}
-            total={summary?.week?.total ?? 0}
-            size={72}
-            strokeWidth={6}
-            color="#9b7fc4"
-            bgColor={colors.muted}
-            label="Week"
-            labelColor={colors.foreground}
-            mutedColor={colors.mutedForeground}
-          />
-          <View style={[s.ringDivider, { backgroundColor: colors.border }]} />
-          <RingChart
-            completed={summary?.month?.completed ?? 0}
-            total={summary?.month?.total ?? 0}
-            size={72}
-            strokeWidth={6}
-            color="#d4a843"
-            bgColor={colors.muted}
-            label="Month"
-            labelColor={colors.foreground}
-            mutedColor={colors.mutedForeground}
-          />
-        </View>
+        )}
       </View>
-
-      {/* ─── Inline Check-in (if not done today) ─── */}
-      {checkinNeeded && (
-        <View style={[s.checkinCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          {!checkinExpanded ? (
-            <Pressable
-              style={s.checkinCollapsed}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCheckinExpanded(true); }}
-            >
-              <Text style={s.checkinIcon}>☀️</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.checkinTitle, { color: colors.foreground }]}>Morning check-in</Text>
-                <Text style={[s.checkinSub, { color: colors.mutedForeground }]}>Log your mood, energy & sleep</Text>
-              </View>
-              <View style={[s.checkinArrow, { backgroundColor: colors.primary }]}>
-                <Text style={[s.checkinArrowText, { color: colors.primaryForeground }]}>Start</Text>
-              </View>
-            </Pressable>
-          ) : (
-            <View style={s.checkinExpanded}>
-              <View style={s.checkinExpandedHeader}>
-                <Text style={[s.checkinTitle, { color: colors.foreground }]}>How are you today?</Text>
-                <Pressable onPress={() => setCheckinExpanded(false)} hitSlop={12}>
-                  <Text style={[s.checkinClose, { color: colors.mutedForeground }]}>✕</Text>
-                </Pressable>
-              </View>
-
-              <Text style={[s.checkinLabel, { color: colors.mutedForeground }]}>Mood</Text>
-              <View style={s.ratingRow}>
-                {[1, 2, 3, 4, 5].map((v) => (
-                  <Pressable
-                    key={v}
-                    onPress={() => { Haptics.selectionAsync(); setCheckinMood(v); }}
-                    style={[s.ratingBtn, { backgroundColor: checkinMood === v ? colors.primary : colors.muted, borderColor: checkinMood === v ? colors.primary : "transparent" }]}
-                  >
-                    <Text style={[s.ratingNum, { color: checkinMood === v ? colors.primaryForeground : colors.foreground }]}>{v}</Text>
-                    <Text style={[s.ratingLbl, { color: checkinMood === v ? colors.primaryForeground : colors.mutedForeground }]}>{MOOD_LABELS[v]}</Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <Text style={[s.checkinLabel, { color: colors.mutedForeground }]}>Energy</Text>
-              <View style={s.ratingRow}>
-                {[1, 2, 3, 4, 5].map((v) => (
-                  <Pressable
-                    key={v}
-                    onPress={() => { Haptics.selectionAsync(); setCheckinEnergy(v); }}
-                    style={[s.ratingBtn, { backgroundColor: checkinEnergy === v ? "#9b7fc4" : colors.muted, borderColor: checkinEnergy === v ? "#9b7fc4" : "transparent" }]}
-                  >
-                    <Text style={[s.ratingNum, { color: checkinEnergy === v ? "#fff" : colors.foreground }]}>{v}</Text>
-                    <Text style={[s.ratingLbl, { color: checkinEnergy === v ? "#fff" : colors.mutedForeground }]}>{ENERGY_LABELS[v]}</Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <Text style={[s.checkinLabel, { color: colors.mutedForeground }]}>Sleep hours</Text>
-              <View style={s.sleepRow}>
-                {SLEEP_OPTIONS.map((h) => (
-                  <Pressable
-                    key={h}
-                    onPress={() => { Haptics.selectionAsync(); setCheckinSleep(h); }}
-                    style={[s.sleepBtn, { backgroundColor: checkinSleep === h ? "#d4a843" : colors.muted }]}
-                  >
-                    <Text style={[s.sleepBtnText, { color: checkinSleep === h ? "#fff" : colors.foreground }]}>{h}h</Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <View style={s.checkinBtnRow}>
-                <Pressable onPress={() => setCheckinExpanded(false)} style={[s.checkinSkip, { borderColor: colors.border }]}>
-                  <Text style={[s.checkinSkipText, { color: colors.mutedForeground }]}>Later</Text>
-                </Pressable>
-                <Pressable
-                  onPress={handleWizardSave}
-                  style={[s.checkinSaveBtn, { backgroundColor: colors.primary, opacity: (checkinMood === 0 || checkinEnergy === 0) ? 0.4 : 1 }]}
-                  disabled={checkinMood === 0 || checkinEnergy === 0 || createDailyContext.isPending}
-                >
-                  {createDailyContext.isPending ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text style={[s.checkinSaveBtnText, { color: colors.primaryForeground }]}>Save check-in</Text>
-                  )}
-                </Pressable>
-              </View>
-            </View>
-          )}
-        </View>
-      )}
 
       {/* ─── Chat ─── */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={0}>
         <FlatList
           data={reversed}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <MessageBubble message={item} colors={colors} />}
+          renderItem={({ item }) => (
+            <MessageBubble
+              message={item}
+              colors={colors}
+              addedTasks={addedTasks}
+              onAddTask={handleAddSuggestedTask}
+            />
+          )}
           inverted={messages.length > 0}
           ListHeaderComponent={showTyping ? <TypingIndicator colors={colors} /> : null}
-          ListEmptyComponent={<EmptyState colors={colors} />}
+          ListEmptyComponent={<EmptyState colors={colors} name={firstName} />}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={messages.length === 0 ? s.emptyContainer : s.msgList}
           showsVerticalScrollIndicator={false}
         />
 
-        <View style={[s.inputBar, { paddingBottom: bottomPad + 8, borderTopColor: colors.border, backgroundColor: colors.background }]}>
-          <TextInput
-            ref={inputRef}
-            style={[s.inputField, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
-            placeholder="Message Luna…"
-            placeholderTextColor={colors.mutedForeground}
-            value={inputText}
-            onChangeText={setInputText}
-            onSubmitEditing={handleSend}
-            blurOnSubmit={false}
-            multiline
-            maxLength={1200}
-            returnKeyType="send"
-          />
-          <Pressable
-            onPress={() => { handleSend(); inputRef.current?.focus(); }}
-            style={[s.sendBtn, { backgroundColor: inputText.trim() && !isStreaming ? colors.primary : colors.muted }]}
-            disabled={!inputText.trim() || isStreaming}
-          >
-            {isStreaming ? (
-              <ActivityIndicator size="small" color={colors.mutedForeground} />
-            ) : (
-              <Text style={[s.sendIcon, { color: inputText.trim() ? colors.primaryForeground : colors.mutedForeground }]}>↑</Text>
-            )}
-          </Pressable>
+        {/* Input area */}
+        <View style={[s.inputArea, { paddingBottom: bottomPad + 6, borderTopColor: colors.border, backgroundColor: colors.background }]}>
+          <Text style={[s.inputLabel, { color: colors.mutedForeground }]}>Plan your day with Luna</Text>
+          <View style={s.inputRow}>
+            <TextInput
+              ref={inputRef}
+              style={[s.inputField, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+              placeholder="Ask anything…"
+              placeholderTextColor={colors.mutedForeground}
+              value={inputText}
+              onChangeText={setInputText}
+              onSubmitEditing={handleSend}
+              blurOnSubmit={false}
+              multiline
+              maxLength={1200}
+              returnKeyType="send"
+            />
+            <Pressable
+              onPress={() => { handleSend(); inputRef.current?.focus(); }}
+              style={[s.sendBtn, { backgroundColor: inputText.trim() && !isStreaming ? colors.primary : colors.muted }]}
+              disabled={!inputText.trim() || isStreaming}
+            >
+              {isStreaming ? (
+                <ActivityIndicator size="small" color={colors.mutedForeground} />
+              ) : (
+                <Text style={[s.sendIcon, { color: inputText.trim() ? colors.primaryForeground : colors.mutedForeground }]}>↑</Text>
+              )}
+            </Pressable>
+          </View>
         </View>
       </KeyboardAvoidingView>
 
@@ -532,32 +512,176 @@ export default function TodayScreen() {
   );
 }
 
-function MessageBubble({ message, colors }: { message: Message; colors: ReturnType<typeof import("@/hooks/useColors").useColors> }) {
-  const isUser = message.role === "user";
+// ─── CheckinExpanded ─────────────────────────────────────────────────────────
+
+function CheckinExpanded({
+  mood, energy, sleep,
+  onMood, onEnergy, onSleep,
+  onSave, onClose, isPending, colors,
+}: {
+  mood: number; energy: number; sleep: number;
+  onMood: (v: number) => void; onEnergy: (v: number) => void; onSleep: (v: number) => void;
+  onSave: () => void; onClose: () => void; isPending: boolean;
+  colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
+}) {
   return (
-    <View style={[mb.row, isUser ? mb.userRow : mb.assistantRow]}>
-      {!isUser && (
-        <View style={[mb.luna, { backgroundColor: colors.primary }]}>
-          <Text style={mb.lunaGlyph}>☽</Text>
+    <View style={ce.container}>
+      <View style={ce.titleRow}>
+        <Text style={[ce.title, { color: colors.foreground }]}>How are you today?</Text>
+        <Pressable onPress={onClose} hitSlop={12}>
+          <Text style={[ce.close, { color: colors.mutedForeground }]}>✕</Text>
+        </Pressable>
+      </View>
+
+      <View style={ce.row}>
+        <Text style={[ce.rowLabel, { color: colors.mutedForeground }]}>Mood</Text>
+        <View style={ce.btns}>
+          {[1,2,3,4,5].map((v) => (
+            <Pressable
+              key={v}
+              onPress={() => { Haptics.selectionAsync(); onMood(v); }}
+              style={[ce.btn, { backgroundColor: mood === v ? colors.primary : colors.muted }]}
+            >
+              <Text style={[ce.btnNum, { color: mood === v ? colors.primaryForeground : colors.foreground }]}>{v}</Text>
+              <Text style={[ce.btnLbl, { color: mood === v ? colors.primaryForeground : colors.mutedForeground }]}>
+                {MOOD_LABELS[v]}
+              </Text>
+            </Pressable>
+          ))}
         </View>
-      )}
-      <View style={[mb.bubble, isUser ? [mb.userBubble, { backgroundColor: colors.primary }] : [mb.assistantBubble, { backgroundColor: colors.card }]]}>
-        <Text style={[mb.text, { color: isUser ? colors.primaryForeground : colors.foreground }]}>
-          {message.content}
-        </Text>
-        <Text style={[mb.time, { color: isUser ? `${colors.primaryForeground}88` : colors.mutedForeground }]}>
-          {formatTime(message.ts)}
-        </Text>
+      </View>
+
+      <View style={ce.row}>
+        <Text style={[ce.rowLabel, { color: colors.mutedForeground }]}>Energy</Text>
+        <View style={ce.btns}>
+          {[1,2,3,4,5].map((v) => (
+            <Pressable
+              key={v}
+              onPress={() => { Haptics.selectionAsync(); onEnergy(v); }}
+              style={[ce.btn, { backgroundColor: energy === v ? "#9b7fc4" : colors.muted }]}
+            >
+              <Text style={[ce.btnNum, { color: energy === v ? "#fff" : colors.foreground }]}>{v}</Text>
+              <Text style={[ce.btnLbl, { color: energy === v ? "#fff" : colors.mutedForeground }]}>
+                {ENERGY_LABELS[v]}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View style={ce.row}>
+        <Text style={[ce.rowLabel, { color: colors.mutedForeground }]}>Sleep</Text>
+        <View style={ce.btns}>
+          {SLEEP_OPTIONS.map((h) => (
+            <Pressable
+              key={h}
+              onPress={() => { Haptics.selectionAsync(); onSleep(h); }}
+              style={[ce.btn, { backgroundColor: sleep === h ? "#d4a843" : colors.muted }]}
+            >
+              <Text style={[ce.btnNum, { color: sleep === h ? "#fff" : colors.foreground }]}>{h}h</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View style={ce.saveRow}>
+        <Pressable onPress={onClose} style={[ce.skipBtn, { borderColor: colors.border }]}>
+          <Text style={[ce.skipTxt, { color: colors.mutedForeground }]}>Later</Text>
+        </Pressable>
+        <Pressable
+          onPress={onSave}
+          disabled={mood === 0 || energy === 0 || isPending}
+          style={[ce.saveBtn, { backgroundColor: colors.primary, opacity: (mood === 0 || energy === 0) ? 0.4 : 1 }]}
+        >
+          {isPending ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={[ce.saveTxt, { color: colors.primaryForeground }]}>Save</Text>
+          )}
+        </Pressable>
       </View>
     </View>
   );
 }
 
+// ─── MessageBubble ────────────────────────────────────────────────────────────
+
+function MessageBubble({
+  message, colors, addedTasks, onAddTask,
+}: {
+  message: Message;
+  colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
+  addedTasks: Set<string>;
+  onAddTask: (msgId: string, task: SuggestedTask) => void;
+}) {
+  const isUser = message.role === "user";
+  return (
+    <View style={[mb.row, isUser ? mb.userRow : mb.assistantRow]}>
+      {!isUser && (
+        <View style={[mb.avatar, { backgroundColor: colors.primary }]}>
+          <Text style={mb.avatarGlyph}>☽</Text>
+        </View>
+      )}
+      <View style={{ maxWidth: "82%", gap: 6 }}>
+        <View style={[mb.bubble, isUser
+          ? [mb.userBubble, { backgroundColor: colors.primary }]
+          : [mb.assistantBubble, { backgroundColor: colors.card }]
+        ]}>
+          <Text style={[mb.text, { color: isUser ? colors.primaryForeground : colors.foreground }]}>
+            {message.content}
+          </Text>
+          <Text style={[mb.time, { color: isUser ? `${colors.primaryForeground}88` : colors.mutedForeground }]}>
+            {formatTime(message.ts)}
+          </Text>
+        </View>
+
+        {/* Task suggestion pills */}
+        {!isUser && message.suggestedTasks && message.suggestedTasks.length > 0 && (
+          <View style={mb.suggestionsWrap}>
+            <Text style={[mb.suggestionsLabel, { color: colors.mutedForeground }]}>
+              Suggested tasks — tap to add:
+            </Text>
+            <View style={mb.suggestionsList}>
+              {message.suggestedTasks.map((task, i) => {
+                const key = `${message.id}-${task.title}`;
+                const added = addedTasks.has(key);
+                return (
+                  <Pressable
+                    key={i}
+                    onPress={() => onAddTask(message.id, task)}
+                    style={[
+                      mb.suggestionPill,
+                      added
+                        ? { backgroundColor: "#70b07022", borderColor: "#70b070" }
+                        : { backgroundColor: colors.accent, borderColor: colors.border },
+                    ]}
+                  >
+                    <Text style={[mb.suggestionPillText, { color: added ? "#3a7a3a" : colors.foreground }]}>
+                      {added ? "✓ " : "+ "}{task.title}
+                    </Text>
+                    {!added && (
+                      <View style={[mb.viewTag, { backgroundColor: colors.muted }]}>
+                        <Text style={[mb.viewTagText, { color: colors.mutedForeground }]}>{task.view}</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
+// ─── TypingIndicator ──────────────────────────────────────────────────────────
+
 function TypingIndicator({ colors }: { colors: ReturnType<typeof import("@/hooks/useColors").useColors> }) {
   return (
     <View style={[mb.row, mb.assistantRow]}>
-      <View style={[mb.luna, { backgroundColor: colors.primary }]}>
-        <Text style={mb.lunaGlyph}>☽</Text>
+      <View style={[mb.avatar, { backgroundColor: colors.primary }]}>
+        <Text style={mb.avatarGlyph}>☽</Text>
       </View>
       <View style={[mb.bubble, mb.assistantBubble, { backgroundColor: colors.card }]}>
         <Text style={[mb.text, { color: colors.mutedForeground }]}>Luna is thinking…</Text>
@@ -566,17 +690,28 @@ function TypingIndicator({ colors }: { colors: ReturnType<typeof import("@/hooks
   );
 }
 
-function EmptyState({ colors }: { colors: ReturnType<typeof import("@/hooks/useColors").useColors> }) {
+// ─── EmptyState ───────────────────────────────────────────────────────────────
+
+const PROMPTS = [
+  "What should I prioritize today?",
+  "Plan tasks for my energy level",
+  "Help me with meals this week",
+  "I'm feeling overwhelmed",
+];
+
+function EmptyState({ colors, name }: { colors: ReturnType<typeof import("@/hooks/useColors").useColors>; name: string }) {
   return (
     <View style={es.container}>
       <View style={[es.avatar, { backgroundColor: colors.primary }]}>
         <Text style={es.avatarGlyph}>☽</Text>
       </View>
-      <Text style={[es.heading, { color: colors.foreground }]}>Hi, I'm Luna</Text>
-      <Text style={[es.sub, { color: colors.mutedForeground }]}>
-        Your personal planner who knows your cycle, energy, and daily life. Ask me anything — or tell me what's on your mind.
+      <Text style={[es.heading, { color: colors.foreground }]}>
+        {name ? `Hi ${name}, I'm Luna` : "Hi, I'm Luna"}
       </Text>
-      <View style={es.promptsGrid}>
+      <Text style={[es.sub, { color: colors.mutedForeground }]}>
+        Your AI planner. I know your cycle, energy, and daily life — tell me what's on your mind.
+      </Text>
+      <View style={es.grid}>
         {PROMPTS.map((p, i) => (
           <View key={i} style={[es.prompt, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[es.promptText, { color: colors.foreground }]}>{p}</Text>
@@ -587,17 +722,12 @@ function EmptyState({ colors }: { colors: ReturnType<typeof import("@/hooks/useC
   );
 }
 
-const PROMPTS = [
-  "How should I schedule my week?",
-  "What tasks suit my energy today?",
-  "Help me plan meals for this phase",
-  "I'm feeling overwhelmed, help me",
-];
+// ─── TasksSheet ───────────────────────────────────────────────────────────────
 
 function TasksSheet({
   tasks, newTaskText, onNewTaskText, onAddTask, onToggle, onDelete, onClose, colors, insets, isWeb, summary,
 }: {
-  tasks: import("@workspace/api-client-react").Task[];
+  tasks: Task[];
   newTaskText: string;
   onNewTaskText: (v: string) => void;
   onAddTask: () => void;
@@ -607,7 +737,7 @@ function TasksSheet({
   colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
   insets: { top: number; bottom: number };
   isWeb: boolean;
-  summary: import("@workspace/api-client-react").TasksSummary | undefined;
+  summary: TasksSummary | undefined;
 }) {
   const topPad = isWeb ? 67 : insets.top;
   const bottomPad = isWeb ? 34 : insets.bottom;
@@ -616,7 +746,7 @@ function TasksSheet({
 
   return (
     <View style={[ts.container, { backgroundColor: colors.background, paddingTop: topPad + 16, paddingBottom: bottomPad + 16 }]}>
-      <View style={[ts.topRow, { paddingHorizontal: 20 }]}>
+      <View style={[ts.topRow]}>
         <Text style={[ts.heading, { color: colors.foreground }]}>Tasks</Text>
         <Pressable onPress={onClose} hitSlop={12}>
           <Text style={[ts.done, { color: colors.primary }]}>Done</Text>
@@ -624,14 +754,14 @@ function TasksSheet({
       </View>
 
       {summary && (
-        <View style={[ts.ringsRow, { paddingHorizontal: 20 }]}>
+        <View style={ts.ringsRow}>
           <RingChart completed={summary.today?.completed ?? 0} total={summary.today?.total ?? 0} size={68} strokeWidth={5} color={colors.primary} bgColor={colors.muted} label="Today" labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
           <RingChart completed={summary.week?.completed ?? 0} total={summary.week?.total ?? 0} size={68} strokeWidth={5} color="#9b7fc4" bgColor={colors.muted} label="Week" labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
           <RingChart completed={summary.month?.completed ?? 0} total={summary.month?.total ?? 0} size={68} strokeWidth={5} color="#d4a843" bgColor={colors.muted} label="Month" labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
         </View>
       )}
 
-      <View style={[ts.addRow, { marginHorizontal: 20, backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={[ts.addRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <TextInput
           style={[ts.addInput, { color: colors.foreground }]}
           placeholder="Add a task…"
@@ -646,7 +776,7 @@ function TasksSheet({
         </Pressable>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={[ts.list, { paddingHorizontal: 20 }]}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={ts.list}>
         {pending.length === 0 && done.length === 0 && (
           <Text style={[ts.empty, { color: colors.mutedForeground }]}>No tasks yet. Add one above.</Text>
         )}
@@ -662,8 +792,10 @@ function TasksSheet({
   );
 }
 
-function TaskRow({ task, onToggle, onDelete, colors }: {
-  task: import("@workspace/api-client-react").Task;
+function TaskRow({
+  task, onToggle, onDelete, colors,
+}: {
+  task: Task;
   onToggle: (id: number, completed: boolean) => void;
   onDelete: (id: number) => void;
   colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
@@ -690,87 +822,101 @@ function TaskRow({ task, onToggle, onDelete, colors }: {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const s = StyleSheet.create({
   root: { flex: 1 },
-  header: { borderBottomWidth: 1, paddingBottom: 14 },
-  headerTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", paddingHorizontal: 20, marginBottom: 12 },
-  headerDay: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular" },
-  headerTitle: { fontSize: 26, fontFamily: "PlusJakartaSans_700Bold", marginTop: 1 },
-  headerRight: { flexDirection: "row", gap: 8, alignItems: "center" },
-  pillBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 100 },
-  pillBtnText: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold" },
-  chipsRow: { paddingHorizontal: 20, gap: 8, paddingBottom: 14 },
-  chip: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100 },
-  chipEmoji: { fontSize: 13 },
-  chipText: { fontSize: 12, fontFamily: "PlusJakartaSans_500Medium" },
-  ringsRow: { flexDirection: "row", justifyContent: "space-evenly", alignItems: "center", paddingHorizontal: 20, paddingTop: 14, borderTopWidth: 1 },
-  ringDivider: { width: 1, height: 56 },
-  checkinCard: { marginHorizontal: 16, marginBottom: 8, marginTop: 2, borderRadius: 14, borderWidth: 1, overflow: "hidden" },
-  checkinCollapsed: { flexDirection: "row", alignItems: "center", padding: 14, gap: 12 },
-  checkinIcon: { fontSize: 22 },
-  checkinTitle: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold" },
-  checkinSub: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", marginTop: 1 },
-  checkinArrow: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100 },
-  checkinArrowText: { fontSize: 12, fontFamily: "PlusJakartaSans_600SemiBold" },
-  checkinExpanded: { padding: 16, gap: 10 },
-  checkinExpandedHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  checkinClose: { fontSize: 16 },
-  checkinLabel: { fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold", textTransform: "uppercase", letterSpacing: 0.6 },
-  ratingRow: { flexDirection: "row", gap: 7 },
-  ratingBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: "center", gap: 3, borderWidth: 1.5 },
-  ratingNum: { fontSize: 16, fontFamily: "PlusJakartaSans_700Bold" },
-  ratingLbl: { fontSize: 9, fontFamily: "PlusJakartaSans_400Regular", textAlign: "center" },
-  sleepRow: { flexDirection: "row", gap: 8 },
-  sleepBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: "center" },
-  sleepBtnText: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold" },
-  checkinBtnRow: { flexDirection: "row", gap: 10, marginTop: 4 },
-  checkinSkip: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, alignItems: "center" },
-  checkinSkipText: { fontSize: 14, fontFamily: "PlusJakartaSans_500Medium" },
-  checkinSaveBtn: { flex: 2, paddingVertical: 12, borderRadius: 12, alignItems: "center" },
-  checkinSaveBtnText: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold" },
-  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  header: { borderBottomWidth: 1, paddingBottom: 0 },
+  welcomeRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingBottom: 10 },
+  welcomeLine: { fontSize: 11, fontFamily: "PlusJakartaSans_400Regular" },
+  welcomeName: { fontSize: 20, fontFamily: "PlusJakartaSans_700Bold", marginTop: 1 },
+  tasksBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100 },
+  tasksBtnText: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold" },
+  statsRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, gap: 12 },
+  miniRingGroup: { flexDirection: "row", gap: 14, alignItems: "center" },
+  divV: { width: 1, height: 50, flexShrink: 0 },
+  contextStack: { flex: 1 },
+  phasePill: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 100, alignSelf: "flex-start" },
+  pillEmoji: { fontSize: 12 },
+  pillText: { fontSize: 12, fontFamily: "PlusJakartaSans_600SemiBold" },
+  ctxChips: { flexDirection: "row", gap: 6 },
+  ctxChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100 },
+  ctxChipTxt: { fontSize: 11, fontFamily: "PlusJakartaSans_500Medium" },
+  checkinBanner: { borderTopWidth: 1 },
+  checkinBannerInner: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 9, gap: 10 },
+  checkinBannerText: { flex: 1, fontSize: 13, fontFamily: "PlusJakartaSans_400Regular" },
+  checkinBannerBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 100 },
+  checkinBannerBtnTxt: { fontSize: 12, fontFamily: "PlusJakartaSans_600SemiBold" },
+  emptyContainer: { flex: 1 },
   msgList: { paddingHorizontal: 14, paddingVertical: 8 },
-  inputBar: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 14, paddingTop: 10, gap: 8, borderTopWidth: 1 },
+  inputArea: { borderTopWidth: 1, paddingTop: 8, paddingHorizontal: 14 },
+  inputLabel: { fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 6 },
+  inputRow: { flexDirection: "row", alignItems: "flex-end", gap: 8, paddingBottom: 2 },
   inputField: { flex: 1, borderWidth: 1, borderRadius: 22, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, fontSize: 15, fontFamily: "PlusJakartaSans_400Regular", maxHeight: 110 },
   sendBtn: { width: 42, height: 42, borderRadius: 21, justifyContent: "center", alignItems: "center", marginBottom: 1 },
   sendIcon: { fontSize: 20, fontFamily: "PlusJakartaSans_700Bold" },
+});
+
+const ce = StyleSheet.create({
+  container: { padding: 14, gap: 10 },
+  titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  title: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold" },
+  close: { fontSize: 16 },
+  row: { gap: 6 },
+  rowLabel: { fontSize: 10, fontFamily: "PlusJakartaSans_600SemiBold", textTransform: "uppercase", letterSpacing: 0.6 },
+  btns: { flexDirection: "row", gap: 6 },
+  btn: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: "center", gap: 2 },
+  btnNum: { fontSize: 14, fontFamily: "PlusJakartaSans_700Bold" },
+  btnLbl: { fontSize: 8, fontFamily: "PlusJakartaSans_400Regular" },
+  saveRow: { flexDirection: "row", gap: 8, marginTop: 2 },
+  skipBtn: { flex: 1, paddingVertical: 10, borderRadius: 12, borderWidth: 1, alignItems: "center" },
+  skipTxt: { fontSize: 13, fontFamily: "PlusJakartaSans_500Medium" },
+  saveBtn: { flex: 2, paddingVertical: 10, borderRadius: 12, alignItems: "center" },
+  saveTxt: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold" },
 });
 
 const mb = StyleSheet.create({
   row: { flexDirection: "row", marginVertical: 3, gap: 8 },
   userRow: { justifyContent: "flex-end" },
   assistantRow: { justifyContent: "flex-start", paddingRight: 40 },
-  luna: { width: 30, height: 30, borderRadius: 15, justifyContent: "center", alignItems: "center", flexShrink: 0, marginTop: 4 },
-  lunaGlyph: { fontSize: 15 },
-  bubble: { maxWidth: "82%", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, gap: 4 },
+  avatar: { width: 28, height: 28, borderRadius: 14, justifyContent: "center", alignItems: "center", flexShrink: 0, marginTop: 6 },
+  avatarGlyph: { fontSize: 13 },
+  bubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, gap: 4 },
   userBubble: { borderBottomRightRadius: 5 },
   assistantBubble: { borderBottomLeftRadius: 5 },
   text: { fontSize: 15, fontFamily: "PlusJakartaSans_400Regular", lineHeight: 22 },
   time: { fontSize: 10, fontFamily: "PlusJakartaSans_400Regular", alignSelf: "flex-end" },
+  suggestionsWrap: { gap: 5, paddingLeft: 4 },
+  suggestionsLabel: { fontSize: 10, fontFamily: "PlusJakartaSans_500Medium" },
+  suggestionsList: { gap: 5 },
+  suggestionPill: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, borderWidth: 1 },
+  suggestionPillText: { flex: 1, fontSize: 13, fontFamily: "PlusJakartaSans_500Medium" },
+  viewTag: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 100 },
+  viewTagText: { fontSize: 10, fontFamily: "PlusJakartaSans_500Medium" },
 });
 
 const es = StyleSheet.create({
-  container: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 28, gap: 14 },
-  avatar: { width: 64, height: 64, borderRadius: 32, justifyContent: "center", alignItems: "center" },
-  avatarGlyph: { fontSize: 28 },
-  heading: { fontSize: 22, fontFamily: "PlusJakartaSans_700Bold", textAlign: "center" },
-  sub: { fontSize: 14, fontFamily: "PlusJakartaSans_400Regular", textAlign: "center", lineHeight: 21 },
-  promptsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 4 },
+  container: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 28, gap: 12 },
+  avatar: { width: 60, height: 60, borderRadius: 30, justifyContent: "center", alignItems: "center" },
+  avatarGlyph: { fontSize: 26 },
+  heading: { fontSize: 20, fontFamily: "PlusJakartaSans_700Bold", textAlign: "center" },
+  sub: { fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", textAlign: "center", lineHeight: 20 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 4 },
   prompt: { borderWidth: 1, borderRadius: 100, paddingHorizontal: 14, paddingVertical: 8 },
   promptText: { fontSize: 13, fontFamily: "PlusJakartaSans_400Regular" },
 });
 
 const ts = StyleSheet.create({
   container: { flex: 1 },
-  topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingHorizontal: 20 },
   heading: { fontSize: 24, fontFamily: "PlusJakartaSans_700Bold" },
   done: { fontSize: 15, fontFamily: "PlusJakartaSans_600SemiBold" },
   ringsRow: { flexDirection: "row", justifyContent: "space-evenly", marginBottom: 20 },
-  addRow: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 14, paddingLeft: 14, marginBottom: 16, overflow: "hidden" },
+  addRow: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 14, paddingLeft: 14, marginBottom: 16, overflow: "hidden", marginHorizontal: 20 },
   addInput: { flex: 1, fontSize: 15, fontFamily: "PlusJakartaSans_400Regular", paddingVertical: 12 },
   addBtn: { width: 46, height: 46, justifyContent: "center", alignItems: "center" },
   addBtnText: { fontSize: 22 },
-  list: { paddingBottom: 24 },
+  list: { paddingBottom: 24, paddingHorizontal: 20 },
   empty: { textAlign: "center", marginTop: 40, fontSize: 14, fontFamily: "PlusJakartaSans_400Regular" },
   sectionLabel: { fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold", textTransform: "uppercase", letterSpacing: 0.8, marginTop: 16, marginBottom: 8 },
 });
