@@ -266,4 +266,78 @@ Respond ONLY with valid JSON in this exact format, no extra text:
   }
 });
 
+router.post("/openai/weekly-recap", async (req, res) => {
+  try {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    const startDate = sevenDaysAgo.toISOString().split("T")[0];
+
+    const [profileResult, cyclePhase, weekContexts, weekTasks] = await Promise.all([
+      db.select().from(profiles).limit(1),
+      db.select().from(cycleEntries).orderBy(desc(cycleEntries.date)).limit(5),
+      db.select().from(dailyContexts).orderBy(desc(dailyContexts.date)).limit(7),
+      db.select().from(tasks).limit(30),
+    ]);
+
+    const profile = profileResult[0];
+    const lastPeriod = cyclePhase.find(e => e.entryType === "period_start");
+    const recentContexts = weekContexts.filter(c => c.date >= startDate);
+    const weekTasksAll = weekTasks;
+
+    const completedTasks = weekTasksAll.filter(t => t.completed).length;
+    const totalTasks = weekTasksAll.length;
+
+    const energyValues = recentContexts.filter(c => c.energyLevel !== null).map(c => c.energyLevel!);
+    const sleepValues = recentContexts.filter(c => c.sleepHours !== null).map(c => c.sleepHours!);
+    const moodValues = recentContexts.filter(c => c.mood).map(c => c.mood!);
+
+    const avgEnergy = energyValues.length > 0 ? energyValues.reduce((a, b) => a + b, 0) / energyValues.length : null;
+    const avgSleep = sleepValues.length > 0 ? sleepValues.reduce((a, b) => a + b, 0) / sleepValues.length : null;
+    const topMood = moodValues.length > 0
+      ? Object.entries(moodValues.reduce((acc, m) => ({ ...acc, [m]: (acc[m] || 0) + 1 }), {} as Record<string, number>))
+          .sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+      : null;
+
+    const systemContext = buildSystemContext(profile, lastPeriod, recentContexts[0], weekTasksAll.filter(t => !t.completed).slice(0, 5));
+
+    const statsContext = `This week's data:
+- Tasks: ${completedTasks} completed out of ${totalTasks} total
+- Average energy: ${avgEnergy !== null ? avgEnergy.toFixed(1) + "/10" : "no data"}
+- Average sleep: ${avgSleep !== null ? avgSleep.toFixed(1) + " hours" : "no data"}
+- Most common mood: ${topMood || "no data"}
+- Days logged: ${recentContexts.length} out of 7`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      max_tokens: 200,
+      messages: [
+        { role: "system", content: systemContext },
+        {
+          role: "user",
+          content: `${statsContext}\n\nGive me a warm, personal weekly recap as Luna — my best friend assistant. Reference the actual numbers and what they mean for me. Keep it to 2-3 sentences max. Genuine, not generic.\n\nRespond ONLY with valid JSON:\n{"message":"your warm recap here"}`,
+        },
+      ],
+      response_format: { type: "json_object" },
+    });
+
+    const raw = completion.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(raw) as { message?: string };
+
+    return res.json({
+      message: parsed.message ?? "You showed up this week, and that matters.",
+      stats: {
+        tasksCompleted: completedTasks,
+        tasksTotal: totalTasks,
+        avgSleep: avgSleep !== null ? Math.round(avgSleep * 10) / 10 : null,
+        avgEnergy: avgEnergy !== null ? Math.round(avgEnergy * 10) / 10 : null,
+        topMood,
+      },
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to generate weekly recap");
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;
+

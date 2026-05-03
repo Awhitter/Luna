@@ -16,7 +16,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Send, Sparkles, CheckCircle2, Circle, Plus, ChevronRight, X } from "lucide-react";
+import { Send, Moon, CheckCircle2, Circle, Plus, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type ChatMessage = { role: "user" | "assistant"; content: string; streaming?: boolean };
@@ -388,7 +388,7 @@ export default function TodayPage() {
             >
               {msg.role === "assistant" && (
                 <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 mt-1">
-                  <Sparkles className="w-4 h-4 text-primary" />
+                  <Moon className="w-4 h-4 text-primary" />
                 </div>
               )}
               <div
@@ -407,7 +407,7 @@ export default function TodayPage() {
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                <Sparkles className="w-8 h-8 text-primary" />
+                <Moon className="w-8 h-8 text-primary" />
               </div>
               <p className="font-medium text-foreground text-sm mb-1">Luna is here for you ✨</p>
               <p className="text-muted-foreground text-xs">Your best friend for getting things done.</p>
@@ -445,7 +445,7 @@ export default function TodayPage() {
             <div className="flex items-start justify-between mb-2">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                  <Moon className="w-3.5 h-3.5 text-primary" />
                 </div>
                 <span className="text-xs font-semibold text-primary">Luna suggests for today</span>
               </div>
@@ -609,7 +609,7 @@ export default function TodayPage() {
             {/* Luna header in wizard */}
             <div className="flex items-center gap-2 mb-4">
               <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center">
-                <Sparkles className="w-3.5 h-3.5 text-primary" />
+                <Moon className="w-3.5 h-3.5 text-primary" />
               </div>
               <span className="text-xs text-muted-foreground">Luna · Morning check-in</span>
             </div>
