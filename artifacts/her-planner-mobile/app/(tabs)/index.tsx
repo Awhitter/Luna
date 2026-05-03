@@ -33,6 +33,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RingChart } from "@/components/RingChart";
 import { useColors } from "@/hooks/useColors";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface SuggestedTask {
   title: string;
@@ -57,23 +58,15 @@ function uid(): string {
 
 let convInitLock = false;
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAYS   = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
 const PHASE_EMOJI: Record<string, string> = {
   menstrual: "🌑", follicular: "🌒", ovulation: "🌕", luteal: "🌖", unknown: "🌙",
 };
-const PHASE_LABEL: Record<string, string> = {
-  menstrual: "Menstrual", follicular: "Follicular", ovulation: "Ovulation", luteal: "Luteal", unknown: "Cycle",
-};
-
-const MOOD_LABELS = ["", "Awful", "Bad", "Okay", "Good", "Great"];
-const ENERGY_LABELS = ["", "None", "Low", "Medium", "High", "Full"];
-const SLEEP_OPTIONS = [5, 6, 7, 8, 9];
 
 function formatTime(ts: number) {
-  const d = new Date(ts);
-  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  return new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
 function parseTasks(content: string): { displayText: string; tasks: SuggestedTask[] } {
@@ -82,10 +75,7 @@ function parseTasks(content: string): { displayText: string; tasks: SuggestedTas
   if (!match?.[1]) return { displayText: content, tasks: [] };
   try {
     const parsed = JSON.parse(match[1]) as { tasks?: SuggestedTask[] };
-    return {
-      displayText: content.replace(taskRegex, "").trim(),
-      tasks: parsed.tasks ?? [],
-    };
+    return { displayText: content.replace(taskRegex, "").trim(), tasks: parsed.tasks ?? [] };
   } catch {
     return { displayText: content.replace(taskRegex, "").trim(), tasks: [] };
   }
@@ -93,6 +83,7 @@ function parseTasks(content: string): { displayText: string; tasks: SuggestedTas
 
 export default function TodayScreen() {
   const colors = useColors();
+  const { t, language } = useLanguage();
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   const isWeb = Platform.OS === "web";
@@ -129,6 +120,13 @@ export default function TodayScreen() {
   const now = new Date();
   const checkinNeeded = !todayCtx;
   const firstName = profile?.name?.split(" ")[0] ?? "";
+  const phaseKey = phase?.phase ?? "unknown";
+
+  // Mood / energy display labels (English internal values sent to API)
+  const MOOD_EN   = ["", "Awful",  "Bad",  "Okay",   "Good",  "Great"];
+  const MOOD_DISP = ["", t("moodAwful"), t("moodBad"), t("moodOkay"), t("moodGood"), t("moodGreat")];
+  const ENERGY_DISP = ["", t("energyNone"), t("energyLow"), t("energyMedium"), t("energyHigh"), t("energyFull")];
+  const SLEEP_OPTIONS = [5, 6, 7, 8, 9];
 
   useEffect(() => {
     if (initialized.current) return;
@@ -162,7 +160,7 @@ export default function TodayScreen() {
           date: today,
           sleepHours: checkinSleep,
           energyLevel: checkinEnergy,
-          mood: MOOD_LABELS[checkinMood] ?? undefined,
+          mood: MOOD_EN[checkinMood] ?? undefined,
         },
       });
       refetchCtx();
@@ -171,7 +169,7 @@ export default function TodayScreen() {
   }
 
   function handlePromptTap(promptText: string) {
-    sendMessage(promptText);
+    void sendMessage(promptText);
   }
 
   async function handleSend() {
@@ -190,8 +188,8 @@ export default function TodayScreen() {
     setIsStreaming(true);
     setShowTyping(true);
 
+    const assistantId = uid();
     let fullContent = "";
-    let assistantId = uid();
     let assistantAdded = false;
 
     try {
@@ -200,7 +198,7 @@ export default function TodayScreen() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-          body: JSON.stringify({ content: text }),
+          body: JSON.stringify({ content: text, language }),
         }
       );
       if (!response.ok) throw new Error("Request failed");
@@ -223,20 +221,19 @@ export default function TodayScreen() {
             const parsed = JSON.parse(data) as { content?: string };
             if (parsed.content) {
               fullContent += parsed.content;
+              const { displayText, tasks: st } = parseTasks(fullContent);
               if (!assistantAdded) {
                 setShowTyping(false);
-                const { displayText, tasks: st } = parseTasks(fullContent);
                 setMessages((prev) => [
                   ...prev,
                   { id: assistantId, role: "assistant", content: displayText, ts: Date.now(), suggestedTasks: st },
                 ]);
                 assistantAdded = true;
               } else {
-                const { displayText, tasks: st } = parseTasks(fullContent);
                 setMessages((prev) => {
                   const updated = [...prev];
                   const last = updated[updated.length - 1];
-                  if (last && last.id === assistantId) {
+                  if (last?.id === assistantId) {
                     updated[updated.length - 1] = { ...last, content: displayText, suggestedTasks: st };
                   }
                   return updated;
@@ -250,7 +247,7 @@ export default function TodayScreen() {
       setShowTyping(false);
       setMessages((prev) => [
         ...prev,
-        { id: uid(), role: "assistant", content: "Sorry, something went wrong. Try again?", ts: Date.now() },
+        { id: uid(), role: "assistant", content: t("errorRetry"), ts: Date.now() },
       ]);
     } finally {
       setIsStreaming(false);
@@ -280,41 +277,29 @@ export default function TodayScreen() {
 
   async function toggleTask(id: number, completed: boolean) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    try {
-      await updateTask.mutateAsync({ id, data: { completed: !completed } });
-      refetchTasks();
-    } catch {}
+    try { await updateTask.mutateAsync({ id, data: { completed: !completed } }); refetchTasks(); } catch {}
   }
-
   async function removeTask(id: number) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try {
-      await deleteTask.mutateAsync({ id });
-      refetchTasks();
-    } catch {}
+    try { await deleteTask.mutateAsync({ id }); refetchTasks(); } catch {}
   }
-
   async function addTask() {
     const title = newTaskText.trim();
     if (!title) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setNewTaskText("");
-    try {
-      await createTask.mutateAsync({ data: { title, category: "personal", priority: "medium", view: "today" } });
-      refetchTasks();
-    } catch {}
+    try { await createTask.mutateAsync({ data: { title, category: "personal", priority: "medium", view: "today" } }); refetchTasks(); } catch {}
   }
 
-  const phaseKey = phase?.phase ?? "unknown";
   const reversed = [...messages].reverse();
+
+  const PROMPTS = [t("prompt1"), t("prompt2"), t("prompt3"), t("prompt4")];
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
 
-      {/* ─── Compact Header ─── */}
+      {/* ─── Header ─── */}
       <View style={[s.header, { paddingTop: topPad + 10, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-
-        {/* Welcome row */}
         <View style={s.welcomeRow}>
           <View style={{ flex: 1 }}>
             {firstName ? (
@@ -323,68 +308,31 @@ export default function TodayScreen() {
                   {DAYS[now.getDay()]}, {MONTHS[now.getMonth()]} {now.getDate()}
                 </Text>
                 <Text style={[s.welcomeName, { color: colors.foreground }]}>
-                  Welcome back, {firstName} 👋
+                  {t("welcomeBack")} {firstName} 👋
                 </Text>
               </>
             ) : (
               <Text style={[s.welcomeName, { color: colors.foreground }]}>Her Planner</Text>
             )}
           </View>
-          <Pressable
-            onPress={() => setShowTasks(true)}
-            style={[s.tasksBtn, { backgroundColor: colors.primary }]}
-          >
-            <Text style={[s.tasksBtnText, { color: colors.primaryForeground }]}>Tasks</Text>
+          <Pressable onPress={() => setShowTasks(true)} style={[s.tasksBtn, { backgroundColor: colors.primary }]}>
+            <Text style={[s.tasksBtnText, { color: colors.primaryForeground }]}>{t("tasks")}</Text>
           </Pressable>
         </View>
 
-        {/* Compact rings + phase info in one row */}
         <View style={[s.statsRow, { borderTopColor: colors.border }]}>
           <View style={s.miniRingGroup}>
-            <RingChart
-              completed={summary?.today?.completed ?? 0}
-              total={summary?.today?.total ?? 0}
-              size={56}
-              strokeWidth={5}
-              color={colors.primary}
-              bgColor={colors.muted}
-              label="Today"
-              labelColor={colors.foreground}
-              mutedColor={colors.mutedForeground}
-            />
-            <RingChart
-              completed={summary?.week?.completed ?? 0}
-              total={summary?.week?.total ?? 0}
-              size={56}
-              strokeWidth={5}
-              color="#9b7fc4"
-              bgColor={colors.muted}
-              label="Week"
-              labelColor={colors.foreground}
-              mutedColor={colors.mutedForeground}
-            />
-            <RingChart
-              completed={summary?.month?.completed ?? 0}
-              total={summary?.month?.total ?? 0}
-              size={56}
-              strokeWidth={5}
-              color="#d4a843"
-              bgColor={colors.muted}
-              label="Month"
-              labelColor={colors.foreground}
-              mutedColor={colors.mutedForeground}
-            />
+            <RingChart completed={summary?.today?.completed ?? 0} total={summary?.today?.total ?? 0} size={56} strokeWidth={5} color={colors.primary} bgColor={colors.muted} label={t("today")} labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
+            <RingChart completed={summary?.week?.completed ?? 0} total={summary?.week?.total ?? 0} size={56} strokeWidth={5} color="#9b7fc4" bgColor={colors.muted} label={t("week")} labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
+            <RingChart completed={summary?.month?.completed ?? 0} total={summary?.month?.total ?? 0} size={56} strokeWidth={5} color="#d4a843" bgColor={colors.muted} label={t("month")} labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
           </View>
-
           <View style={[s.divV, { backgroundColor: colors.border }]} />
-
-          {/* Phase + context info stack */}
           <View style={s.contextStack}>
             <View style={[s.phasePill, { backgroundColor: colors.accent }]}>
               <Text style={s.pillEmoji}>{PHASE_EMOJI[phaseKey]}</Text>
               <Text style={[s.pillText, { color: colors.foreground }]}>
-                {PHASE_LABEL[phaseKey]}
-                {phase?.dayInCycle != null ? ` · D${phase.dayInCycle}` : ""}
+                {t(`phase${phaseKey.charAt(0).toUpperCase() + phaseKey.slice(1)}` as "phaseMenstrual")}
+                {phase?.dayInCycle != null ? ` · ${t("dayShort", { n: phase.dayInCycle })}` : ""}
               </Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 5 }}>
@@ -401,7 +349,7 @@ export default function TodayScreen() {
                 )}
                 {phase?.nextPeriodIn != null && (
                   <View style={[s.ctxChip, { backgroundColor: colors.muted }]}>
-                    <Text style={[s.ctxChipTxt, { color: colors.mutedForeground }]}>📅 {phase.nextPeriodIn}d</Text>
+                    <Text style={[s.ctxChipTxt, { color: colors.mutedForeground }]}>📅 {t("periodIn", { n: phase.nextPeriodIn })}</Text>
                   </View>
                 )}
               </View>
@@ -417,11 +365,9 @@ export default function TodayScreen() {
                 style={s.checkinBannerInner}
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCheckinExpanded(true); }}
               >
-                <Text style={[s.checkinBannerText, { color: colors.mutedForeground }]}>
-                  ☀️  Morning check-in — how are you today?
-                </Text>
+                <Text style={[s.checkinBannerText, { color: colors.mutedForeground }]}>☀️  {t("checkinBanner")}</Text>
                 <View style={[s.checkinBannerBtn, { backgroundColor: colors.primary }]}>
-                  <Text style={[s.checkinBannerBtnTxt, { color: colors.primaryForeground }]}>Start</Text>
+                  <Text style={[s.checkinBannerBtnTxt, { color: colors.primaryForeground }]}>{t("checkinStart")}</Text>
                 </View>
               </Pressable>
             ) : (
@@ -436,6 +382,15 @@ export default function TodayScreen() {
                 onClose={() => setCheckinExpanded(false)}
                 isPending={createDailyContext.isPending}
                 colors={colors}
+                moodDisp={MOOD_DISP}
+                energyDisp={ENERGY_DISP}
+                sleepOptions={SLEEP_OPTIONS}
+                tCheckinTitle={t("checkinTitle")}
+                tMood={t("checkinMood")}
+                tEnergy={t("checkinEnergy")}
+                tSleep={t("checkinSleep")}
+                tLater={t("checkinLater")}
+                tSave={t("checkinSave")}
               />
             )}
           </View>
@@ -448,30 +403,24 @@ export default function TodayScreen() {
           data={reversed}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <MessageBubble
-              message={item}
-              colors={colors}
-              addedTasks={addedTasks}
-              onAddTask={handleAddSuggestedTask}
-            />
+            <MessageBubble message={item} colors={colors} addedTasks={addedTasks} onAddTask={handleAddSuggestedTask} tSuggested={t("suggestedTasks")} />
           )}
           inverted={messages.length > 0}
-          ListHeaderComponent={showTyping ? <TypingIndicator colors={colors} /> : null}
-          ListEmptyComponent={<EmptyState colors={colors} name={firstName} onPrompt={handlePromptTap} />}
+          ListHeaderComponent={showTyping ? <TypingBubble colors={colors} text={t("lunaThinking")} /> : null}
+          ListEmptyComponent={<EmptyState colors={colors} name={firstName} onPrompt={handlePromptTap} prompts={PROMPTS} hiPrefix={t("hiPrefix")} iAmLuna={t("iAmLuna")} desc={t("lunaDesc")} />}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={messages.length === 0 ? s.emptyContainer : s.msgList}
           showsVerticalScrollIndicator={false}
         />
 
-        {/* Input area */}
         <View style={[s.inputArea, { paddingBottom: bottomPad + 6, borderTopColor: colors.border, backgroundColor: colors.background }]}>
-          <Text style={[s.inputLabel, { color: colors.mutedForeground }]}>Plan your day with Luna</Text>
+          <Text style={[s.inputLabel, { color: colors.mutedForeground }]}>{t("planYourDay")}</Text>
           <View style={s.inputRow}>
             <TextInput
               ref={inputRef}
               style={[s.inputField, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
-              placeholder="Ask anything…"
+              placeholder={t("inputPlaceholder")}
               placeholderTextColor={colors.mutedForeground}
               value={inputText}
               onChangeText={setInputText}
@@ -482,27 +431,21 @@ export default function TodayScreen() {
               returnKeyType="send"
             />
             <Pressable
-              onPress={() => { handleSend(); inputRef.current?.focus(); }}
+              onPress={() => { void handleSend(); inputRef.current?.focus(); }}
               style={[s.sendBtn, { backgroundColor: inputText.trim() && !isStreaming ? colors.primary : colors.muted }]}
               disabled={!inputText.trim() || isStreaming}
             >
-              {isStreaming ? (
-                <ActivityIndicator size="small" color={colors.mutedForeground} />
-              ) : (
-                <Text style={[s.sendIcon, { color: inputText.trim() ? colors.primaryForeground : colors.mutedForeground }]}>↑</Text>
-              )}
+              {isStreaming
+                ? <ActivityIndicator size="small" color={colors.mutedForeground} />
+                : <Text style={[s.sendIcon, { color: inputText.trim() ? colors.primaryForeground : colors.mutedForeground }]}>↑</Text>
+              }
             </Pressable>
           </View>
         </View>
       </KeyboardAvoidingView>
 
       {/* ─── Tasks Modal ─── */}
-      <Modal
-        visible={showTasks}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowTasks(false)}
-      >
+      <Modal visible={showTasks} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowTasks(false)}>
         <TasksSheet
           tasks={tasks ?? []}
           newTaskText={newTaskText}
@@ -515,98 +458,89 @@ export default function TodayScreen() {
           insets={insets}
           isWeb={isWeb}
           summary={summary}
+          tDone={t("done")}
+          tAddPh={t("addTaskPh")}
+          tNoTasks={t("noTasks")}
+          tCompleted={t("completedLabel")}
+          tTasks={t("tasks")}
+          tToday={t("today")}
+          tWeek={t("week")}
+          tMonth={t("month")}
         />
       </Modal>
     </View>
   );
 }
 
-// ─── CheckinExpanded ─────────────────────────────────────────────────────────
+// ─── CheckinExpanded ──────────────────────────────────────────────────────────
 
 function CheckinExpanded({
   mood, energy, sleep,
   onMood, onEnergy, onSleep,
   onSave, onClose, isPending, colors,
+  moodDisp, energyDisp, sleepOptions,
+  tCheckinTitle, tMood, tEnergy, tSleep, tLater, tSave,
 }: {
   mood: number; energy: number; sleep: number;
   onMood: (v: number) => void; onEnergy: (v: number) => void; onSleep: (v: number) => void;
   onSave: () => void; onClose: () => void; isPending: boolean;
   colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
+  moodDisp: string[]; energyDisp: string[]; sleepOptions: number[];
+  tCheckinTitle: string; tMood: string; tEnergy: string; tSleep: string; tLater: string; tSave: string;
 }) {
   return (
     <View style={ce.container}>
       <View style={ce.titleRow}>
-        <Text style={[ce.title, { color: colors.foreground }]}>How are you today?</Text>
+        <Text style={[ce.title, { color: colors.foreground }]}>{tCheckinTitle}</Text>
         <Pressable onPress={onClose} hitSlop={12}>
           <Text style={[ce.close, { color: colors.mutedForeground }]}>✕</Text>
         </Pressable>
       </View>
-
       <View style={ce.row}>
-        <Text style={[ce.rowLabel, { color: colors.mutedForeground }]}>Mood</Text>
+        <Text style={[ce.rowLabel, { color: colors.mutedForeground }]}>{tMood}</Text>
         <View style={ce.btns}>
           {[1,2,3,4,5].map((v) => (
-            <Pressable
-              key={v}
-              onPress={() => { Haptics.selectionAsync(); onMood(v); }}
-              style={[ce.btn, { backgroundColor: mood === v ? colors.primary : colors.muted }]}
-            >
+            <Pressable key={v} onPress={() => { Haptics.selectionAsync(); onMood(v); }}
+              style={[ce.btn, { backgroundColor: mood === v ? colors.primary : colors.muted }]}>
               <Text style={[ce.btnNum, { color: mood === v ? colors.primaryForeground : colors.foreground }]}>{v}</Text>
-              <Text style={[ce.btnLbl, { color: mood === v ? colors.primaryForeground : colors.mutedForeground }]}>
-                {MOOD_LABELS[v]}
-              </Text>
+              <Text style={[ce.btnLbl, { color: mood === v ? colors.primaryForeground : colors.mutedForeground }]}>{moodDisp[v]}</Text>
             </Pressable>
           ))}
         </View>
       </View>
-
       <View style={ce.row}>
-        <Text style={[ce.rowLabel, { color: colors.mutedForeground }]}>Energy</Text>
+        <Text style={[ce.rowLabel, { color: colors.mutedForeground }]}>{tEnergy}</Text>
         <View style={ce.btns}>
           {[1,2,3,4,5].map((v) => (
-            <Pressable
-              key={v}
-              onPress={() => { Haptics.selectionAsync(); onEnergy(v); }}
-              style={[ce.btn, { backgroundColor: energy === v ? "#9b7fc4" : colors.muted }]}
-            >
+            <Pressable key={v} onPress={() => { Haptics.selectionAsync(); onEnergy(v); }}
+              style={[ce.btn, { backgroundColor: energy === v ? "#9b7fc4" : colors.muted }]}>
               <Text style={[ce.btnNum, { color: energy === v ? "#fff" : colors.foreground }]}>{v}</Text>
-              <Text style={[ce.btnLbl, { color: energy === v ? "#fff" : colors.mutedForeground }]}>
-                {ENERGY_LABELS[v]}
-              </Text>
+              <Text style={[ce.btnLbl, { color: energy === v ? "#fff" : colors.mutedForeground }]}>{energyDisp[v]}</Text>
             </Pressable>
           ))}
         </View>
       </View>
-
       <View style={ce.row}>
-        <Text style={[ce.rowLabel, { color: colors.mutedForeground }]}>Sleep</Text>
+        <Text style={[ce.rowLabel, { color: colors.mutedForeground }]}>{tSleep}</Text>
         <View style={ce.btns}>
-          {SLEEP_OPTIONS.map((h) => (
-            <Pressable
-              key={h}
-              onPress={() => { Haptics.selectionAsync(); onSleep(h); }}
-              style={[ce.btn, { backgroundColor: sleep === h ? "#d4a843" : colors.muted }]}
-            >
+          {sleepOptions.map((h) => (
+            <Pressable key={h} onPress={() => { Haptics.selectionAsync(); onSleep(h); }}
+              style={[ce.btn, { backgroundColor: sleep === h ? "#d4a843" : colors.muted }]}>
               <Text style={[ce.btnNum, { color: sleep === h ? "#fff" : colors.foreground }]}>{h}h</Text>
             </Pressable>
           ))}
         </View>
       </View>
-
       <View style={ce.saveRow}>
         <Pressable onPress={onClose} style={[ce.skipBtn, { borderColor: colors.border }]}>
-          <Text style={[ce.skipTxt, { color: colors.mutedForeground }]}>Later</Text>
+          <Text style={[ce.skipTxt, { color: colors.mutedForeground }]}>{tLater}</Text>
         </Pressable>
         <Pressable
           onPress={onSave}
           disabled={mood === 0 || energy === 0 || isPending}
           style={[ce.saveBtn, { backgroundColor: colors.primary, opacity: (mood === 0 || energy === 0) ? 0.4 : 1 }]}
         >
-          {isPending ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={[ce.saveTxt, { color: colors.primaryForeground }]}>Save</Text>
-          )}
+          {isPending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={[ce.saveTxt, { color: colors.primaryForeground }]}>{tSave}</Text>}
         </Pressable>
       </View>
     </View>
@@ -615,13 +549,12 @@ function CheckinExpanded({
 
 // ─── MessageBubble ────────────────────────────────────────────────────────────
 
-function MessageBubble({
-  message, colors, addedTasks, onAddTask,
-}: {
+function MessageBubble({ message, colors, addedTasks, onAddTask, tSuggested }: {
   message: Message;
   colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
   addedTasks: Set<string>;
   onAddTask: (msgId: string, task: SuggestedTask) => void;
+  tSuggested: string;
 }) {
   const isUser = message.role === "user";
   return (
@@ -632,39 +565,22 @@ function MessageBubble({
         </View>
       )}
       <View style={{ maxWidth: "82%", gap: 6 }}>
-        <View style={[mb.bubble, isUser
-          ? [mb.userBubble, { backgroundColor: colors.primary }]
-          : [mb.assistantBubble, { backgroundColor: colors.card }]
-        ]}>
-          <Text style={[mb.text, { color: isUser ? colors.primaryForeground : colors.foreground }]}>
-            {message.content}
-          </Text>
-          <Text style={[mb.time, { color: isUser ? `${colors.primaryForeground}88` : colors.mutedForeground }]}>
-            {formatTime(message.ts)}
-          </Text>
+        <View style={[mb.bubble, isUser ? [mb.userBubble, { backgroundColor: colors.primary }] : [mb.assistantBubble, { backgroundColor: colors.card }]]}>
+          <Text style={[mb.text, { color: isUser ? colors.primaryForeground : colors.foreground }]}>{message.content}</Text>
+          <Text style={[mb.time, { color: isUser ? `${colors.primaryForeground}88` : colors.mutedForeground }]}>{formatTime(message.ts)}</Text>
         </View>
-
-        {/* Task suggestion pills */}
         {!isUser && message.suggestedTasks && message.suggestedTasks.length > 0 && (
           <View style={mb.suggestionsWrap}>
-            <Text style={[mb.suggestionsLabel, { color: colors.mutedForeground }]}>
-              Suggested tasks — tap to add:
-            </Text>
+            <Text style={[mb.suggestionsLabel, { color: colors.mutedForeground }]}>{tSuggested}</Text>
             <View style={mb.suggestionsList}>
               {message.suggestedTasks.map((task, i) => {
                 const key = `${message.id}-${task.title}`;
                 const added = addedTasks.has(key);
                 return (
-                  <Pressable
-                    key={i}
-                    onPress={() => onAddTask(message.id, task)}
-                    style={[
-                      mb.suggestionPill,
-                      added
-                        ? { backgroundColor: "#70b07022", borderColor: "#70b070" }
-                        : { backgroundColor: colors.accent, borderColor: colors.border },
-                    ]}
-                  >
+                  <Pressable key={i} onPress={() => onAddTask(message.id, task)}
+                    style={[mb.suggestionPill, added
+                      ? { backgroundColor: "#70b07022", borderColor: "#70b070" }
+                      : { backgroundColor: colors.accent, borderColor: colors.border }]}>
                     <Text style={[mb.suggestionPillText, { color: added ? "#3a7a3a" : colors.foreground }]}>
                       {added ? "✓ " : "+ "}{task.title}
                     </Text>
@@ -684,38 +600,25 @@ function MessageBubble({
   );
 }
 
-// ─── TypingIndicator ──────────────────────────────────────────────────────────
-
-function TypingIndicator({ colors }: { colors: ReturnType<typeof import("@/hooks/useColors").useColors> }) {
+function TypingBubble({ colors, text }: { colors: ReturnType<typeof import("@/hooks/useColors").useColors>; text: string }) {
   return (
     <View style={[mb.row, mb.assistantRow]}>
-      <View style={[mb.avatar, { backgroundColor: colors.primary }]}>
-        <Text style={mb.avatarGlyph}>☽</Text>
-      </View>
+      <View style={[mb.avatar, { backgroundColor: colors.primary }]}><Text style={mb.avatarGlyph}>☽</Text></View>
       <View style={[mb.bubble, mb.assistantBubble, { backgroundColor: colors.card }]}>
-        <Text style={[mb.text, { color: colors.mutedForeground }]}>Luna is thinking…</Text>
+        <Text style={[mb.text, { color: colors.mutedForeground }]}>{text}</Text>
       </View>
     </View>
   );
 }
 
-// ─── EmptyState ───────────────────────────────────────────────────────────────
-
-const PROMPTS = [
-  "What should I prioritize today?",
-  "Plan tasks for my energy level",
-  "Help me with meals this week",
-  "I'm feeling overwhelmed",
-];
-
-function EmptyState({
-  colors,
-  name,
-  onPrompt,
-}: {
+function EmptyState({ colors, name, onPrompt, prompts, hiPrefix, iAmLuna, desc }: {
   colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
   name: string;
   onPrompt: (text: string) => void;
+  prompts: string[];
+  hiPrefix: string;
+  iAmLuna: string;
+  desc: string;
 }) {
   return (
     <View style={es.container}>
@@ -723,26 +626,18 @@ function EmptyState({
         <Text style={es.avatarGlyph}>☽</Text>
       </View>
       <Text style={[es.heading, { color: colors.foreground }]}>
-        {name ? `Hi ${name}, I'm Luna` : "Hi, I'm Luna"}
+        {name ? `${hiPrefix} ${name}, ${iAmLuna}` : iAmLuna}
       </Text>
-      <Text style={[es.sub, { color: colors.mutedForeground }]}>
-        Your AI planner. I know your cycle, energy, and daily life — tell me what's on your mind.
-      </Text>
+      <Text style={[es.sub, { color: colors.mutedForeground }]}>{desc}</Text>
       <View style={es.grid}>
-        {PROMPTS.map((p, i) => (
+        {prompts.map((p, i) => (
           <Pressable
             key={i}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              onPrompt(p);
-            }}
-            style={({ pressed }) => [
-              es.prompt,
-              {
-                backgroundColor: pressed ? colors.primary : colors.card,
-                borderColor: pressed ? colors.primary : colors.border,
-              },
-            ]}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPrompt(p); }}
+            style={({ pressed }) => [es.prompt, {
+              backgroundColor: pressed ? colors.primary : colors.card,
+              borderColor: pressed ? colors.primary : colors.border,
+            }]}
           >
             <Text style={[es.promptText, { color: colors.foreground }]}>{p}</Text>
           </Pressable>
@@ -752,11 +647,7 @@ function EmptyState({
   );
 }
 
-// ─── TasksSheet ───────────────────────────────────────────────────────────────
-
-function TasksSheet({
-  tasks, newTaskText, onNewTaskText, onAddTask, onToggle, onDelete, onClose, colors, insets, isWeb, summary,
-}: {
+function TasksSheet({ tasks, newTaskText, onNewTaskText, onAddTask, onToggle, onDelete, onClose, colors, insets, isWeb, summary, tDone, tAddPh, tNoTasks, tCompleted, tTasks, tToday, tWeek, tMonth }: {
   tasks: Task[];
   newTaskText: string;
   onNewTaskText: (v: string) => void;
@@ -768,6 +659,8 @@ function TasksSheet({
   insets: { top: number; bottom: number };
   isWeb: boolean;
   summary: TasksSummary | undefined;
+  tDone: string; tAddPh: string; tNoTasks: string; tCompleted: string;
+  tTasks: string; tToday: string; tWeek: string; tMonth: string;
 }) {
   const topPad = isWeb ? 67 : insets.top;
   const bottomPad = isWeb ? 34 : insets.bottom;
@@ -776,44 +669,29 @@ function TasksSheet({
 
   return (
     <View style={[ts.container, { backgroundColor: colors.background, paddingTop: topPad + 16, paddingBottom: bottomPad + 16 }]}>
-      <View style={[ts.topRow]}>
-        <Text style={[ts.heading, { color: colors.foreground }]}>Tasks</Text>
-        <Pressable onPress={onClose} hitSlop={12}>
-          <Text style={[ts.done, { color: colors.primary }]}>Done</Text>
-        </Pressable>
+      <View style={ts.topRow}>
+        <Text style={[ts.heading, { color: colors.foreground }]}>{tTasks}</Text>
+        <Pressable onPress={onClose} hitSlop={12}><Text style={[ts.done, { color: colors.primary }]}>{tDone}</Text></Pressable>
       </View>
-
       {summary && (
         <View style={ts.ringsRow}>
-          <RingChart completed={summary.today?.completed ?? 0} total={summary.today?.total ?? 0} size={68} strokeWidth={5} color={colors.primary} bgColor={colors.muted} label="Today" labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
-          <RingChart completed={summary.week?.completed ?? 0} total={summary.week?.total ?? 0} size={68} strokeWidth={5} color="#9b7fc4" bgColor={colors.muted} label="Week" labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
-          <RingChart completed={summary.month?.completed ?? 0} total={summary.month?.total ?? 0} size={68} strokeWidth={5} color="#d4a843" bgColor={colors.muted} label="Month" labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
+          <RingChart completed={summary.today?.completed ?? 0} total={summary.today?.total ?? 0} size={68} strokeWidth={5} color={colors.primary} bgColor={colors.muted} label={tToday} labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
+          <RingChart completed={summary.week?.completed ?? 0} total={summary.week?.total ?? 0} size={68} strokeWidth={5} color="#9b7fc4" bgColor={colors.muted} label={tWeek} labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
+          <RingChart completed={summary.month?.completed ?? 0} total={summary.month?.total ?? 0} size={68} strokeWidth={5} color="#d4a843" bgColor={colors.muted} label={tMonth} labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
         </View>
       )}
-
       <View style={[ts.addRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <TextInput
-          style={[ts.addInput, { color: colors.foreground }]}
-          placeholder="Add a task…"
-          placeholderTextColor={colors.mutedForeground}
-          value={newTaskText}
-          onChangeText={onNewTaskText}
-          onSubmitEditing={onAddTask}
-          returnKeyType="done"
-        />
+        <TextInput style={[ts.addInput, { color: colors.foreground }]} placeholder={tAddPh} placeholderTextColor={colors.mutedForeground} value={newTaskText} onChangeText={onNewTaskText} onSubmitEditing={onAddTask} returnKeyType="done" />
         <Pressable onPress={onAddTask} style={[ts.addBtn, { backgroundColor: colors.primary }]}>
           <Text style={[ts.addBtnText, { color: colors.primaryForeground }]}>+</Text>
         </Pressable>
       </View>
-
       <ScrollView style={{ flex: 1 }} contentContainerStyle={ts.list}>
-        {pending.length === 0 && done.length === 0 && (
-          <Text style={[ts.empty, { color: colors.mutedForeground }]}>No tasks yet. Add one above.</Text>
-        )}
+        {pending.length === 0 && done.length === 0 && <Text style={[ts.empty, { color: colors.mutedForeground }]}>{tNoTasks}</Text>}
         {pending.map((t) => <TaskRow key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} colors={colors} />)}
         {done.length > 0 && (
           <>
-            <Text style={[ts.sectionLabel, { color: colors.mutedForeground }]}>Completed</Text>
+            <Text style={[ts.sectionLabel, { color: colors.mutedForeground }]}>{tCompleted}</Text>
             {done.map((t) => <TaskRow key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} colors={colors} />)}
           </>
         )}
@@ -822,9 +700,7 @@ function TasksSheet({
   );
 }
 
-function TaskRow({
-  task, onToggle, onDelete, colors,
-}: {
+function TaskRow({ task, onToggle, onDelete, colors }: {
   task: Task;
   onToggle: (id: number, completed: boolean) => void;
   onDelete: (id: number) => void;
@@ -837,26 +713,16 @@ function TaskRow({
           {task.completed && <Text style={tr.tick}>✓</Text>}
         </View>
       </Pressable>
-      <Text style={[tr.title, { color: task.completed ? colors.mutedForeground : colors.foreground, textDecorationLine: task.completed ? "line-through" : "none" }]} numberOfLines={2}>
-        {task.title}
-      </Text>
-      {task.category && (
-        <View style={[tr.cat, { backgroundColor: colors.muted }]}>
-          <Text style={[tr.catText, { color: colors.mutedForeground }]}>{task.category}</Text>
-        </View>
-      )}
-      <Pressable onPress={() => onDelete(task.id)} hitSlop={8}>
-        <Text style={[tr.del, { color: colors.mutedForeground }]}>✕</Text>
-      </Pressable>
+      <Text style={[tr.title, { color: task.completed ? colors.mutedForeground : colors.foreground, textDecorationLine: task.completed ? "line-through" : "none" }]} numberOfLines={2}>{task.title}</Text>
+      {task.category && <View style={[tr.cat, { backgroundColor: colors.muted }]}><Text style={[tr.catText, { color: colors.mutedForeground }]}>{task.category}</Text></View>}
+      <Pressable onPress={() => onDelete(task.id)} hitSlop={8}><Text style={[tr.del, { color: colors.mutedForeground }]}>✕</Text></Pressable>
     </View>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const s = StyleSheet.create({
   root: { flex: 1 },
-  header: { borderBottomWidth: 1, paddingBottom: 0 },
+  header: { borderBottomWidth: 1 },
   welcomeRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingBottom: 10 },
   welcomeLine: { fontSize: 11, fontFamily: "PlusJakartaSans_400Regular" },
   welcomeName: { fontSize: 20, fontFamily: "PlusJakartaSans_700Bold", marginTop: 1 },

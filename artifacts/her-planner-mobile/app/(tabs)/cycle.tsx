@@ -18,75 +18,24 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
-
-const PHASE_INFO: Record<
-  string,
-  { color: string; emoji: string; description: string; energy: string; recommendations: string[] }
-> = {
-  menstrual: {
-    color: "#e07070",
-    emoji: "🌑",
-    description: "Your body is shedding and renewing. Rest is your superpower right now.",
-    energy: "Rest & restore",
-    recommendations: ["Gentle movement", "Warm nourishing foods", "Sleep in if you can", "Say no to big commitments"],
-  },
-  follicular: {
-    color: "#70b070",
-    emoji: "🌒",
-    description: "Estrogen rises and so does your energy. Great time to start new things.",
-    energy: "Rising energy",
-    recommendations: ["Try something new", "Plan ahead", "Social activities", "Creative work"],
-  },
-  ovulation: {
-    color: "#d4a843",
-    emoji: "🌕",
-    description: "Peak energy and social energy. You're radiant and magnetic today.",
-    energy: "Peak energy",
-    recommendations: ["Networking & meetings", "High-intensity workouts", "Bold conversations", "Date night"],
-  },
-  luteal: {
-    color: "#9b7fc4",
-    emoji: "🌖",
-    description: "Progesterone rises. You may crave comfort and quiet. Honor that.",
-    energy: "Wind down",
-    recommendations: ["Finish existing tasks", "Reduce screen time", "Magnesium-rich foods", "Cozy time at home"],
-  },
-  unknown: {
-    color: "#b0b0b0",
-    emoji: "🌙",
-    description: "Log your period start to get cycle phase predictions.",
-    energy: "Unknown",
-    recommendations: ["Log your cycle", "Track your symptoms", "Note your energy levels"],
-  },
-};
-
-const PHASE_LABEL: Record<string, string> = {
-  menstrual: "Menstrual",
-  follicular: "Follicular",
-  ovulation: "Ovulation",
-  luteal: "Luteal",
-  unknown: "Cycle",
-};
+import { useLanguage } from "@/contexts/LanguageContext";
 
 import type { CreateCycleEntryBodyEntryType } from "@workspace/api-client-react";
 
-const ENTRY_TYPES: { value: CreateCycleEntryBodyEntryType; label: string }[] = [
-  { value: "period_start", label: "Period Start" },
-  { value: "period_end", label: "Period End" },
-  { value: "ovulation", label: "Ovulation" },
-  { value: "symptom", label: "Symptom" },
-  { value: "note", label: "Note" },
-];
-
-const SYMPTOMS = ["Cramps", "Headache", "Bloating", "Tender breasts", "Mood swings", "Fatigue", "Acne", "Cravings"];
+const PHASE_COLORS: Record<string, string> = {
+  menstrual: "#e07070", follicular: "#70b070", ovulation: "#d4a843", luteal: "#9b7fc4", unknown: "#b0b0b0",
+};
+const PHASE_EMOJI: Record<string, string> = {
+  menstrual: "🌑", follicular: "🌒", ovulation: "🌕", luteal: "🌖", unknown: "🌙",
+};
 
 function formatEntryDate(dateStr: string) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 export default function CycleScreen() {
   const colors = useColors();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === "web";
   const topPad = isWeb ? 67 : insets.top;
@@ -101,7 +50,34 @@ export default function CycleScreen() {
   const createEntry = useCreateCycleEntry();
 
   const phaseKey = phase?.phase ?? "unknown";
-  const info = PHASE_INFO[phaseKey] ?? PHASE_INFO.unknown;
+  const phaseColor = PHASE_COLORS[phaseKey] ?? PHASE_COLORS.unknown;
+
+  // Phase descriptions use translations
+  const phaseDescKey = `phaseDesc${phaseKey.charAt(0).toUpperCase() + phaseKey.slice(1)}` as "phaseDescMenstrual";
+  const energyKey = `energy${phaseKey.charAt(0).toUpperCase() + phaseKey.slice(1)}` as "energyMenstrual";
+  const recKeys = [0,1,2,3].map((i) => `rec${phaseKey.charAt(0).toUpperCase() + phaseKey.slice(1)}${i}` as "recMenstrual0");
+
+  const ENTRY_TYPE_MAP: Record<CreateCycleEntryBodyEntryType, string> = {
+    period_start: t("entryPeriodStart"),
+    period_end:   t("entryPeriodEnd"),
+    ovulation:    t("entryOvulation"),
+    symptom:      t("entrySymptom"),
+    note:         t("entryNote"),
+  };
+
+  const ENTRY_TYPES: { value: CreateCycleEntryBodyEntryType; label: string }[] = [
+    { value: "period_start", label: t("entryPeriodStart") },
+    { value: "period_end",   label: t("entryPeriodEnd")   },
+    { value: "ovulation",    label: t("entryOvulation")   },
+    { value: "symptom",      label: t("entrySymptom")     },
+    { value: "note",         label: t("entryNote")        },
+  ];
+
+  const SYMPTOMS_KEYS = [
+    "symCramps","symHeadache","symBloating","symTenderBreasts",
+    "symMoodSwings","symFatigue","symAcne","symCravings",
+  ] as const;
+  const SYMPTOMS = SYMPTOMS_KEYS.map((k) => ({ key: k, label: t(k) }));
 
   async function handleLog() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -121,11 +97,9 @@ export default function CycleScreen() {
     } catch {}
   }
 
-  function toggleSymptom(s: string) {
+  function toggleSymptom(label: string) {
     Haptics.selectionAsync();
-    setLogSymptoms((prev) =>
-      prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
-    );
+    setLogSymptoms((prev) => prev.includes(label) ? prev.filter((x) => x !== label) : [...prev, label]);
   }
 
   return (
@@ -135,55 +109,48 @@ export default function CycleScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={s.titleRow}>
-          <Text style={[s.heading, { color: colors.foreground }]}>Cycle</Text>
-          <Pressable
-            onPress={() => setShowLog(true)}
-            style={[s.logBtn, { backgroundColor: colors.primary }]}
-          >
-            <Text style={[s.logBtnText, { color: colors.primaryForeground }]}>+ Log</Text>
+          <Text style={[s.heading, { color: colors.foreground }]}>{t("cycleTitle")}</Text>
+          <Pressable onPress={() => setShowLog(true)} style={[s.logBtn, { backgroundColor: colors.primary }]}>
+            <Text style={[s.logBtnText, { color: colors.primaryForeground }]}>{t("logBtn")}</Text>
           </Pressable>
         </View>
 
         {loadingPhase ? (
-          <View style={s.loading}>
-            <ActivityIndicator color={colors.primary} />
-          </View>
+          <View style={s.loading}><ActivityIndicator color={colors.primary} /></View>
         ) : (
-          <View style={[s.phaseCard, { backgroundColor: info.color + "22", borderColor: info.color + "55" }]}>
+          <View style={[s.phaseCard, { backgroundColor: phaseColor + "22", borderColor: phaseColor + "55" }]}>
             <View style={s.phaseCardTop}>
               <View>
-                <Text style={[s.phaseEmoji]}>{info.emoji}</Text>
-                <Text style={[s.phaseLabel, { color: info.color }]}>
-                  {PHASE_LABEL[phaseKey]}
+                <Text style={s.phaseEmoji}>{PHASE_EMOJI[phaseKey]}</Text>
+                <Text style={[s.phaseLabel, { color: phaseColor }]}>
+                  {t(`phase${phaseKey.charAt(0).toUpperCase() + phaseKey.slice(1)}` as "phaseMenstrual")}
                 </Text>
                 {phase?.dayInCycle != null && (
                   <Text style={[s.phaseDayText, { color: colors.mutedForeground }]}>
-                    Day {phase.dayInCycle}
+                    {t("phaseDay", { n: phase.dayInCycle })}
                   </Text>
                 )}
               </View>
               {phase?.nextPeriodIn != null && (
-                <View style={[s.nextPeriodBadge, { backgroundColor: info.color + "33" }]}>
-                  <Text style={[s.nextPeriodLabel, { color: info.color }]}>Next period</Text>
-                  <Text style={[s.nextPeriodDays, { color: info.color }]}>
-                    in {phase.nextPeriodIn}d
-                  </Text>
+                <View style={[s.nextPeriodBadge, { backgroundColor: phaseColor + "33" }]}>
+                  <Text style={[s.nextPeriodLabel, { color: phaseColor }]}>{t("nextPeriodLabel")}</Text>
+                  <Text style={[s.nextPeriodDays, { color: phaseColor }]}>{t("inDays", { n: phase.nextPeriodIn })}</Text>
                 </View>
               )}
             </View>
 
-            <Text style={[s.phaseDesc, { color: colors.foreground }]}>{info.description}</Text>
+            <Text style={[s.phaseDesc, { color: colors.foreground }]}>{t(phaseDescKey)}</Text>
 
-            <View style={[s.energyBadge, { backgroundColor: info.color + "33" }]}>
-              <Text style={[s.energyBadgeText, { color: info.color }]}>{info.energy}</Text>
+            <View style={[s.energyBadge, { backgroundColor: phaseColor + "33" }]}>
+              <Text style={[s.energyBadgeText, { color: phaseColor }]}>{t(energyKey)}</Text>
             </View>
 
             <View style={s.recSection}>
-              <Text style={[s.recTitle, { color: colors.mutedForeground }]}>RECOMMENDATIONS</Text>
-              {info.recommendations.map((rec, i) => (
+              <Text style={[s.recTitle, { color: colors.mutedForeground }]}>{t("recommendations")}</Text>
+              {recKeys.map((rk, i) => (
                 <View key={i} style={s.recRow}>
-                  <View style={[s.recDot, { backgroundColor: info.color }]} />
-                  <Text style={[s.recText, { color: colors.foreground }]}>{rec}</Text>
+                  <View style={[s.recDot, { backgroundColor: phaseColor }]} />
+                  <Text style={[s.recText, { color: colors.foreground }]}>{t(rk)}</Text>
                 </View>
               ))}
             </View>
@@ -192,47 +159,36 @@ export default function CycleScreen() {
 
         {entries && entries.length > 0 && (
           <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[s.cardTitle, { color: colors.foreground }]}>Recent Entries</Text>
+            <Text style={[s.cardTitle, { color: colors.foreground }]}>{t("recentEntries")}</Text>
             {entries.slice(0, 8).map((entry, i) => (
               <View
                 key={entry.id ?? i}
                 style={[s.entryRow, { borderBottomColor: colors.border, borderBottomWidth: i < Math.min(entries.length, 8) - 1 ? 1 : 0 }]}
               >
-                <View style={[s.entryDot, { backgroundColor: PHASE_INFO[entry.entryType ?? "unknown"]?.color ?? colors.primary }]} />
+                <View style={[s.entryDot, { backgroundColor: PHASE_COLORS[entry.entryType ?? "unknown"] ?? colors.primary }]} />
                 <View style={{ flex: 1 }}>
                   <Text style={[s.entryType, { color: colors.foreground }]}>
-                    {ENTRY_TYPES.find((t) => t.value === entry.entryType)?.label ?? entry.entryType}
+                    {ENTRY_TYPE_MAP[entry.entryType as CreateCycleEntryBodyEntryType] ?? entry.entryType}
                   </Text>
                   {entry.symptoms && (
-                    <Text style={[s.entrySymptoms, { color: colors.mutedForeground }]} numberOfLines={1}>
-                      {entry.symptoms}
-                    </Text>
+                    <Text style={[s.entrySymptoms, { color: colors.mutedForeground }]} numberOfLines={1}>{entry.symptoms}</Text>
                   )}
                 </View>
-                <Text style={[s.entryDate, { color: colors.mutedForeground }]}>
-                  {formatEntryDate(entry.date)}
-                </Text>
+                <Text style={[s.entryDate, { color: colors.mutedForeground }]}>{formatEntryDate(entry.date)}</Text>
               </View>
             ))}
           </View>
         )}
 
-        {loadingEntries && (
-          <View style={s.loading}>
-            <ActivityIndicator color={colors.primary} />
-          </View>
-        )}
+        {loadingEntries && <View style={s.loading}><ActivityIndicator color={colors.primary} /></View>}
       </ScrollView>
 
-      <Modal
-        visible={showLog}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowLog(false)}
-      >
+      <Modal visible={showLog} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowLog(false)}>
         <LogSheet
           logType={logType}
           symptoms={logSymptoms}
+          entryTypes={ENTRY_TYPES}
+          symptomItems={SYMPTOMS}
           onType={setLogType}
           onToggleSymptom={toggleSymptom}
           onSave={handleLog}
@@ -241,6 +197,11 @@ export default function CycleScreen() {
           colors={colors}
           insets={insets}
           isWeb={isWeb}
+          tTitle={t("logEntry")}
+          tCancel={t("cancel")}
+          tType={t("typeLabel")}
+          tSymptoms={t("symptomsOptional")}
+          tSave={t("saveEntry")}
         />
       </Modal>
     </View>
@@ -248,10 +209,14 @@ export default function CycleScreen() {
 }
 
 function LogSheet({
-  logType, symptoms, onType, onToggleSymptom, onSave, onClose, saving, colors, insets, isWeb,
+  logType, symptoms, entryTypes, symptomItems,
+  onType, onToggleSymptom, onSave, onClose, saving, colors, insets, isWeb,
+  tTitle, tCancel, tType, tSymptoms, tSave,
 }: {
   logType: CreateCycleEntryBodyEntryType;
   symptoms: string[];
+  entryTypes: { value: CreateCycleEntryBodyEntryType; label: string }[];
+  symptomItems: { key: string; label: string }[];
   onType: (v: CreateCycleEntryBodyEntryType) => void;
   onToggleSymptom: (s: string) => void;
   onSave: () => void;
@@ -260,68 +225,51 @@ function LogSheet({
   colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
   insets: { top: number; bottom: number };
   isWeb: boolean;
+  tTitle: string; tCancel: string; tType: string; tSymptoms: string; tSave: string;
 }) {
   const topPad = isWeb ? 67 : insets.top;
   const bottomPad = isWeb ? 34 : insets.bottom;
 
   return (
-    <View style={[logStyles.container, { backgroundColor: colors.background, paddingTop: topPad + 16, paddingBottom: bottomPad + 24 }]}>
-      <View style={[logStyles.topRow, { paddingHorizontal: 20 }]}>
-        <Text style={[logStyles.title, { color: colors.foreground }]}>Log Entry</Text>
+    <View style={[ls.container, { backgroundColor: colors.background, paddingTop: topPad + 16, paddingBottom: bottomPad + 24 }]}>
+      <View style={[ls.topRow, { paddingHorizontal: 20 }]}>
+        <Text style={[ls.title, { color: colors.foreground }]}>{tTitle}</Text>
         <Pressable onPress={onClose} hitSlop={12}>
-          <Text style={[logStyles.cancel, { color: colors.mutedForeground }]}>Cancel</Text>
+          <Text style={[ls.cancel, { color: colors.mutedForeground }]}>{tCancel}</Text>
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={[logStyles.content, { paddingHorizontal: 20 }]} keyboardShouldPersistTaps="handled">
-        <Text style={[logStyles.sectionLabel, { color: colors.mutedForeground }]}>TYPE</Text>
-        <View style={logStyles.typeGrid}>
-          {ENTRY_TYPES.map((t) => (
+      <ScrollView contentContainerStyle={[ls.content, { paddingHorizontal: 20 }]} keyboardShouldPersistTaps="handled">
+        <Text style={[ls.sectionLabel, { color: colors.mutedForeground }]}>{tType}</Text>
+        <View style={ls.typeGrid}>
+          {entryTypes.map((et) => (
             <Pressable
-              key={t.value}
-              onPress={() => { Haptics.selectionAsync(); onType(t.value); }}
-              style={[logStyles.typeBtn, {
-                backgroundColor: logType === t.value ? colors.primary : colors.card,
-                borderColor: logType === t.value ? colors.primary : colors.border,
-              }]}
+              key={et.value}
+              onPress={() => { Haptics.selectionAsync(); onType(et.value); }}
+              style={[ls.typeBtn, { backgroundColor: logType === et.value ? colors.primary : colors.card, borderColor: logType === et.value ? colors.primary : colors.border }]}
             >
-              <Text style={[logStyles.typeBtnText, { color: logType === t.value ? colors.primaryForeground : colors.foreground }]}>
-                {t.label}
-              </Text>
+              <Text style={[ls.typeBtnText, { color: logType === et.value ? colors.primaryForeground : colors.foreground }]}>{et.label}</Text>
             </Pressable>
           ))}
         </View>
 
-        <Text style={[logStyles.sectionLabel, { color: colors.mutedForeground, marginTop: 24 }]}>SYMPTOMS (OPTIONAL)</Text>
-        <View style={logStyles.symptomGrid}>
-          {SYMPTOMS.map((sym) => (
+        <Text style={[ls.sectionLabel, { color: colors.mutedForeground, marginTop: 24 }]}>{tSymptoms}</Text>
+        <View style={ls.symptomGrid}>
+          {symptomItems.map((sym) => (
             <Pressable
-              key={sym}
-              onPress={() => onToggleSymptom(sym)}
-              style={[logStyles.symptomBtn, {
-                backgroundColor: symptoms.includes(sym) ? colors.accent : colors.card,
-                borderColor: symptoms.includes(sym) ? colors.primary : colors.border,
-              }]}
+              key={sym.key}
+              onPress={() => onToggleSymptom(sym.label)}
+              style={[ls.symptomBtn, { backgroundColor: symptoms.includes(sym.label) ? colors.accent : colors.card, borderColor: symptoms.includes(sym.label) ? colors.primary : colors.border }]}
             >
-              <Text style={[logStyles.symptomText, { color: symptoms.includes(sym) ? colors.primary : colors.foreground }]}>
-                {sym}
-              </Text>
+              <Text style={[ls.symptomText, { color: symptoms.includes(sym.label) ? colors.primary : colors.foreground }]}>{sym.label}</Text>
             </Pressable>
           ))}
         </View>
       </ScrollView>
 
-      <View style={[logStyles.footer, { paddingHorizontal: 20 }]}>
-        <Pressable
-          onPress={onSave}
-          style={[logStyles.saveBtn, { backgroundColor: colors.primary }]}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color={colors.primaryForeground} />
-          ) : (
-            <Text style={[logStyles.saveBtnText, { color: colors.primaryForeground }]}>Save Entry</Text>
-          )}
+      <View style={[ls.footer, { paddingHorizontal: 20 }]}>
+        <Pressable onPress={onSave} style={[ls.saveBtn, { backgroundColor: colors.primary }]} disabled={saving}>
+          {saving ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Text style={[ls.saveBtnText, { color: colors.primaryForeground }]}>{tSave}</Text>}
         </Pressable>
       </View>
     </View>
@@ -359,7 +307,7 @@ const s = StyleSheet.create({
   entryDate: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", flexShrink: 0 },
 });
 
-const logStyles = StyleSheet.create({
+const ls = StyleSheet.create({
   container: { flex: 1 },
   topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 },
   title: { fontSize: 22, fontFamily: "PlusJakartaSans_700Bold" },

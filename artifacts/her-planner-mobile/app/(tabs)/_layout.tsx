@@ -8,25 +8,27 @@ import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 function NativeTabLayout() {
+  const { t } = useLanguage();
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: "sun.max", selected: "sun.max.fill" }} />
-        <Label>Today</Label>
+        <Label>{t("tabToday")}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="week">
         <Icon sf={{ default: "calendar", selected: "calendar" }} />
-        <Label>Week</Label>
+        <Label>{t("tabWeek")}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="cycle">
         <Icon sf={{ default: "moon.stars", selected: "moon.stars.fill" }} />
-        <Label>Cycle</Label>
+        <Label>{t("tabCycle")}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
-        <Label>Me</Label>
+        <Label>{t("tabMe")}</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -34,6 +36,7 @@ function NativeTabLayout() {
 
 function ClassicTabLayout() {
   const colors = useColors();
+  const { t } = useLanguage();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
@@ -61,12 +64,7 @@ function ClassicTabLayout() {
               style={StyleSheet.absoluteFill}
             />
           ) : isWeb ? (
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                { backgroundColor: colors.background },
-              ]}
-            />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]} />
           ) : null,
         tabBarLabelStyle: {
           fontFamily: "PlusJakartaSans_500Medium",
@@ -77,49 +75,33 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Today",
+          title: t("tabToday"),
           tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="sun.max" tintColor={color} size={24} />
-            ) : (
-              <Feather name="sun" size={22} color={color} />
-            ),
+            isIOS ? <SymbolView name="sun.max" tintColor={color} size={24} /> : <Feather name="sun" size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="week"
         options={{
-          title: "Week",
+          title: t("tabWeek"),
           tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="calendar" tintColor={color} size={24} />
-            ) : (
-              <Feather name="calendar" size={22} color={color} />
-            ),
+            isIOS ? <SymbolView name="calendar" tintColor={color} size={24} /> : <Feather name="calendar" size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="cycle"
         options={{
-          title: "Cycle",
+          title: t("tabCycle"),
           tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="moon.stars" tintColor={color} size={24} />
-            ) : (
-              <Feather name="moon" size={22} color={color} />
-            ),
+            isIOS ? <SymbolView name="moon.stars" tintColor={color} size={24} /> : <Feather name="moon" size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Me",
+          title: t("tabMe"),
           tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="person" tintColor={color} size={24} />
-            ) : (
-              <Feather name="user" size={22} color={color} />
-            ),
+            isIOS ? <SymbolView name="person" tintColor={color} size={24} /> : <Feather name="user" size={22} color={color} />,
         }}
       />
     </Tabs>

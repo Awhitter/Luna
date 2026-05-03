@@ -1,0 +1,175 @@
+export type LangCode = "en" | "es" | "pt";
+type TR = Record<LangCode, string>;
+
+export const T: Record<string, TR> = {
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  tabToday:   { en: "Today",  es: "Hoy",     pt: "Hoje"    },
+  tabWeek:    { en: "Week",   es: "Semana",  pt: "Semana"  },
+  tabCycle:   { en: "Cycle",  es: "Ciclo",   pt: "Ciclo"   },
+  tabMe:      { en: "Me",     es: "Yo",      pt: "Eu"      },
+
+  // ── Phases ────────────────────────────────────────────────────────────────
+  phaseMenstrual: { en: "Menstrual",  es: "Menstrual",  pt: "Menstrual"  },
+  phaseFollicular:{ en: "Follicular", es: "Folicular",  pt: "Folicular"  },
+  phaseOvulation: { en: "Ovulation",  es: "Ovulación",  pt: "Ovulação"   },
+  phaseLuteal:    { en: "Luteal",     es: "Lútea",      pt: "Lútea"      },
+  phaseUnknown:   { en: "Cycle",      es: "Ciclo",      pt: "Ciclo"      },
+
+  phaseDescMenstrual:  { en: "Your body is shedding and renewing. Rest is your superpower right now.", es: "Tu cuerpo está renovándose. El descanso es tu superpoder ahora.", pt: "Seu corpo está se renovando. O descanso é seu superpoder agora." },
+  phaseDescFollicular: { en: "Estrogen rises and so does your energy. Great time to start new things.", es: "El estrógeno y tu energía están subiendo. Gran momento para empezar algo nuevo.", pt: "O estrogênio e sua energia estão aumentando. Ótimo momento para começar coisas novas." },
+  phaseDescOvulation:  { en: "Peak energy and social energy. You're radiant and magnetic today.", es: "Pico de energía y carisma. Hoy estás radiante y magnética.", pt: "Pico de energia e carisma. Hoje você está radiante e magnética." },
+  phaseDescLuteal:     { en: "Progesterone rises. You may crave comfort and quiet. Honor that.", es: "La progesterona aumenta. Puede que busques comodidad y tranquilidad. Hónralo.", pt: "A progesterona aumenta. Você pode querer conforto e quietude. Honre isso." },
+  phaseDescUnknown:    { en: "Log your period start to get cycle phase predictions.", es: "Registra el inicio de tu período para obtener predicciones.", pt: "Registre o início do seu período para obter previsões." },
+
+  energyMenstrual: { en: "Rest & restore",  es: "Descansa y repara",   pt: "Descanse e renove"    },
+  energyFollicular:{ en: "Rising energy",   es: "Energía creciente",   pt: "Energia crescente"    },
+  energyOvulation: { en: "Peak energy",     es: "Energía máxima",      pt: "Energia máxima"       },
+  energyLuteal:    { en: "Wind down",       es: "Desacelera",          pt: "Desacelere"           },
+  energyUnknown:   { en: "Unknown",         es: "Desconocida",         pt: "Desconhecida"         },
+
+  recMenstrual0: { en: "Gentle movement",       es: "Movimiento suave",            pt: "Movimento leve"            },
+  recMenstrual1: { en: "Warm nourishing foods", es: "Comidas cálidas y nutritivas", pt: "Alimentos quentes e nutritivos" },
+  recMenstrual2: { en: "Sleep in if you can",   es: "Duerme más si puedes",        pt: "Durma mais se puder"       },
+  recMenstrual3: { en: "Say no to big commitments", es: "Di no a grandes compromisos", pt: "Diga não a grandes compromissos" },
+
+  recFollicular0: { en: "Try something new",   es: "Prueba algo nuevo",      pt: "Experimente algo novo"   },
+  recFollicular1: { en: "Plan ahead",           es: "Planifica con anticipación", pt: "Planeje com antecedência" },
+  recFollicular2: { en: "Social activities",    es: "Actividades sociales",   pt: "Atividades sociais"       },
+  recFollicular3: { en: "Creative work",        es: "Trabajo creativo",       pt: "Trabalho criativo"        },
+
+  recOvulation0: { en: "Networking & meetings", es: "Networking y reuniones", pt: "Networking e reuniões"    },
+  recOvulation1: { en: "High-intensity workouts", es: "Ejercicio intenso",   pt: "Exercícios intensos"      },
+  recOvulation2: { en: "Bold conversations",    es: "Conversaciones difíciles", pt: "Conversas importantes"  },
+  recOvulation3: { en: "Date night",            es: "Noche de cita",          pt: "Noite a dois"             },
+
+  recLuteal0: { en: "Finish existing tasks",  es: "Termina tareas pendientes", pt: "Conclua tarefas pendentes" },
+  recLuteal1: { en: "Reduce screen time",     es: "Reduce tiempo de pantalla", pt: "Reduza o tempo de tela"   },
+  recLuteal2: { en: "Magnesium-rich foods",   es: "Alimentos ricos en magnesio", pt: "Alimentos ricos em magnésio" },
+  recLuteal3: { en: "Cozy time at home",      es: "Tiempo acogedor en casa",  pt: "Tempo aconchegante em casa" },
+
+  recUnknown0: { en: "Log your cycle",          es: "Registra tu ciclo",       pt: "Registre seu ciclo"       },
+  recUnknown1: { en: "Track your symptoms",     es: "Registra tus síntomas",   pt: "Rastreie seus sintomas"   },
+  recUnknown2: { en: "Note your energy levels", es: "Anota tus niveles de energía", pt: "Anote seus níveis de energia" },
+
+  // ── Today screen ──────────────────────────────────────────────────────────
+  welcomeBack:    { en: "Welcome back,",  es: "Bienvenida,",    pt: "Bem-vinda,"       },
+  tasks:          { en: "Tasks",          es: "Tareas",         pt: "Tarefas"          },
+  periodIn:       { en: "Period in {n}d", es: "Período en {n}d", pt: "Período em {n}d" },
+  dayShort:       { en: "D{n}",          es: "D{n}",           pt: "D{n}"             },
+
+  checkinBanner:  { en: "Morning check-in — how are you today?", es: "Check-in matutino — ¿cómo estás hoy?", pt: "Check-in matinal — como você está hoje?" },
+  checkinStart:   { en: "Start",          es: "Iniciar",        pt: "Iniciar"          },
+  checkinTitle:   { en: "How are you today?", es: "¿Cómo estás hoy?", pt: "Como você está hoje?" },
+  checkinMood:    { en: "Mood",           es: "Estado de ánimo",pt: "Humor"            },
+  checkinEnergy:  { en: "Energy",         es: "Energía",        pt: "Energia"          },
+  checkinSleep:   { en: "Sleep",          es: "Sueño",          pt: "Sono"             },
+  checkinLater:   { en: "Later",          es: "Después",        pt: "Depois"           },
+  checkinSave:    { en: "Save",           es: "Guardar",        pt: "Salvar"           },
+
+  moodAwful: { en: "Awful",  es: "Pésimo", pt: "Péssimo" },
+  moodBad:   { en: "Bad",    es: "Malo",   pt: "Ruim"    },
+  moodOkay:  { en: "Okay",   es: "Bien",   pt: "Ok"      },
+  moodGood:  { en: "Good",   es: "Bueno",  pt: "Bom"     },
+  moodGreat: { en: "Great",  es: "¡Genial!", pt: "Ótimo" },
+
+  energyNone:   { en: "None",   es: "Nula",   pt: "Nenhuma" },
+  energyLow:    { en: "Low",    es: "Baja",   pt: "Baixa"   },
+  energyMedium: { en: "Medium", es: "Media",  pt: "Média"   },
+  energyHigh:   { en: "High",   es: "Alta",   pt: "Alta"    },
+  energyFull:   { en: "Full",   es: "Máxima", pt: "Total"   },
+
+  planYourDay:    { en: "PLAN YOUR DAY WITH LUNA", es: "PLANIFICA TU DÍA CON LUNA", pt: "PLANEJE SEU DIA COM LUNA" },
+  inputPlaceholder:{ en: "Ask anything…",          es: "Pregunta lo que quieras…",  pt: "Pergunte o que quiser…"   },
+  lunaThinking:   { en: "Luna is thinking…",       es: "Luna está pensando…",       pt: "Luna está pensando…"      },
+  hiPrefix:       { en: "Hi",                      es: "Hola",                      pt: "Oi"                       },
+  iAmLuna:        { en: "I'm Luna",                es: "Soy Luna",                  pt: "Sou a Luna"               },
+  lunaDesc:       { en: "Your AI planner. I know your cycle, energy, and daily life — tell me what's on your mind.", es: "Tu planificadora con IA. Conozco tu ciclo, energía y vida diaria — cuéntame qué tienes en mente.", pt: "Sua planejadora com IA. Conheço seu ciclo, energia e vida diária — me conta o que está pensando." },
+  suggestedTasks: { en: "Suggested tasks — tap to add:", es: "Tareas sugeridas — toca para agregar:", pt: "Tarefas sugeridas — toque para adicionar:" },
+  errorRetry:     { en: "Sorry, something went wrong. Try again?", es: "Lo siento, algo salió mal. ¿Intentamos de nuevo?", pt: "Desculpe, algo deu errado. Tentar novamente?" },
+
+  prompt1: { en: "What should I prioritize today?",   es: "¿Qué debo priorizar hoy?",                pt: "O que devo priorizar hoje?"              },
+  prompt2: { en: "Plan tasks for my energy level",    es: "Planifica tareas según mi energía",        pt: "Planeje tarefas para meu nível de energia" },
+  prompt3: { en: "Help me with meals this week",      es: "Ayúdame con las comidas esta semana",      pt: "Me ajuda com as refeições desta semana"  },
+  prompt4: { en: "I'm feeling overwhelmed",           es: "Me siento abrumada",                      pt: "Estou me sentindo sobrecarregada"         },
+
+  done:          { en: "Done",                      es: "Listo",                      pt: "Pronto"                       },
+  addTaskPh:     { en: "Add a task…",               es: "Agregar tarea…",             pt: "Adicionar tarefa…"            },
+  noTasks:       { en: "No tasks yet. Add one above.", es: "Sin tareas. Agrega una arriba.", pt: "Sem tarefas. Adicione uma acima." },
+  completedLabel:{ en: "Completed",                 es: "Completadas",                pt: "Concluídas"                   },
+
+  // ── Common stats ──────────────────────────────────────────────────────────
+  today:  { en: "Today",  es: "Hoy",    pt: "Hoje"   },
+  week:   { en: "Week",   es: "Semana", pt: "Semana" },
+  month:  { en: "Month",  es: "Mes",    pt: "Mês"    },
+
+  // ── Week screen ───────────────────────────────────────────────────────────
+  thisWeek:     { en: "This Week",                     es: "Esta Semana",                  pt: "Esta Semana"                    },
+  taskProgress: { en: "Task Progress",                 es: "Progreso de Tareas",           pt: "Progresso das Tarefas"          },
+  dayOfCycle:   { en: "Day {n} of cycle",              es: "Día {n} del ciclo",            pt: "Dia {n} do ciclo"               },
+  nextPeriod:   { en: "next period",                   es: "próximo período",              pt: "próximo período"                },
+  inDays:       { en: "in {n}d",                       es: "en {n}d",                      pt: "em {n}d"                        },
+  weekAtGlance: { en: "Week at a glance",              es: "Semana de un vistazo",         pt: "Semana em resumo"               },
+  energyLogged: { en: "Energy levels logged this week",es: "Niveles de energía esta semana", pt: "Níveis de energia esta semana"},
+  byCategory:   { en: "By Category",                  es: "Por Categoría",                pt: "Por Categoria"                  },
+
+  catWork:    { en: "Work",     es: "Trabajo",          pt: "Trabalho"          },
+  catPersonal:{ en: "Personal", es: "Personal",         pt: "Pessoal"           },
+  catKids:    { en: "Kids",     es: "Niños",            pt: "Filhos"            },
+  catHealth:  { en: "Health",   es: "Salud",            pt: "Saúde"             },
+  catErrands: { en: "Errands",  es: "Recados",          pt: "Recados"           },
+  catChores:  { en: "Chores",   es: "Tareas del hogar", pt: "Tarefas domésticas"},
+  catFood:    { en: "Food",     es: "Comida",           pt: "Comida"            },
+  catSelfCare:{ en: "Self-care",es: "Autocuidado",      pt: "Autocuidado"       },
+
+  // ── Cycle screen ──────────────────────────────────────────────────────────
+  cycleTitle:      { en: "Cycle",            es: "Ciclo",               pt: "Ciclo"                },
+  logBtn:          { en: "+ Log",            es: "+ Registrar",         pt: "+ Registrar"          },
+  nextPeriodLabel: { en: "Next period",      es: "Próximo período",     pt: "Próximo período"      },
+  phaseDay:        { en: "Day {n}",          es: "Día {n}",             pt: "Dia {n}"              },
+  recommendations: { en: "RECOMMENDATIONS", es: "RECOMENDACIONES",     pt: "RECOMENDAÇÕES"        },
+  recentEntries:   { en: "Recent Entries",   es: "Entradas Recientes",  pt: "Entradas Recentes"    },
+
+  entryPeriodStart: { en: "Period Start", es: "Inicio del período", pt: "Início do período" },
+  entryPeriodEnd:   { en: "Period End",   es: "Fin del período",    pt: "Fim do período"    },
+  entryOvulation:   { en: "Ovulation",   es: "Ovulación",          pt: "Ovulação"          },
+  entrySymptom:     { en: "Symptom",     es: "Síntoma",            pt: "Sintoma"           },
+  entryNote:        { en: "Note",        es: "Nota",               pt: "Nota"              },
+
+  logEntry:        { en: "Log Entry",             es: "Registrar",             pt: "Registrar"             },
+  cancel:          { en: "Cancel",                es: "Cancelar",              pt: "Cancelar"              },
+  typeLabel:       { en: "TYPE",                  es: "TIPO",                  pt: "TIPO"                  },
+  symptomsOptional:{ en: "SYMPTOMS (OPTIONAL)",   es: "SÍNTOMAS (OPCIONAL)",   pt: "SINTOMAS (OPCIONAL)"   },
+  saveEntry:       { en: "Save Entry",            es: "Guardar",               pt: "Salvar"                },
+
+  symCramps:       { en: "Cramps",         es: "Cólicos",               pt: "Cólicas"              },
+  symHeadache:     { en: "Headache",       es: "Dolor de cabeza",       pt: "Dor de cabeça"        },
+  symBloating:     { en: "Bloating",       es: "Hinchazón",             pt: "Inchaço"              },
+  symTenderBreasts:{ en: "Tender breasts", es: "Sensibilidad en pechos",pt: "Sensibilidade nos seios" },
+  symMoodSwings:   { en: "Mood swings",    es: "Cambios de humor",      pt: "Mudanças de humor"    },
+  symFatigue:      { en: "Fatigue",        es: "Fatiga",                pt: "Fadiga"               },
+  symAcne:         { en: "Acne",           es: "Acné",                  pt: "Acne"                 },
+  symCravings:     { en: "Cravings",       es: "Antojos",               pt: "Desejos"              },
+
+  // ── Profile screen ────────────────────────────────────────────────────────
+  myProfile:       { en: "My Profile",        es: "Mi Perfil",             pt: "Meu Perfil"           },
+  yourName:        { en: "YOUR NAME",          es: "TU NOMBRE",             pt: "SEU NOME"             },
+  namePlaceholder: { en: "What should Luna call you?", es: "¿Cómo quieres que te llame Luna?", pt: "Como Luna deve te chamar?" },
+  lunaLanguage:    { en: "LUNA'S LANGUAGE",    es: "IDIOMA DE LUNA",        pt: "IDIOMA DA LUNA"       },
+  lunaLanguageSub: { en: "Luna will respond in your chosen language", es: "Luna responderá en el idioma elegido", pt: "Luna responderá no idioma escolhido" },
+  workSchedule:    { en: "WORK SCHEDULE",      es: "HORARIO DE TRABAJO",    pt: "HORÁRIO DE TRABALHO"  },
+  doYouHaveKids:   { en: "DO YOU HAVE KIDS?",  es: "¿TIENES HIJOS?",        pt: "VOCÊ TEM FILHOS?"     },
+  noKids:          { en: "No",                 es: "No",                    pt: "Não"                  },
+  yesKids:         { en: "Yes",                es: "Sí",                    pt: "Sim"                  },
+  howMany:         { en: "How many?",           es: "¿Cuántos?",             pt: "Quantos?"             },
+  healthConditions:{ en: "HEALTH CONDITIONS",  es: "CONDICIONES DE SALUD",  pt: "CONDIÇÕES DE SAÚDE"   },
+  healthSub:       { en: "Helps Luna give better support (optional)", es: "Ayuda a Luna a darte mejor apoyo (opcional)", pt: "Ajuda Luna a te dar um suporte melhor (opcional)" },
+  healthPlaceholder:{ en: "e.g. PCOS, endometriosis, anxiety…", es: "ej. SOP, endometriosis, ansiedad…", pt: "ex. SOP, endometriose, ansiedade…" },
+  saveProfile:     { en: "Save Profile",       es: "Guardar Perfil",        pt: "Salvar Perfil"        },
+  savedProfile:    { en: "✓ Saved",            es: "✓ Guardado",            pt: "✓ Salvo"              },
+
+  wsFullTime: { en: "Full-time",   es: "Tiempo completo", pt: "Tempo integral" },
+  wsPartTime: { en: "Part-time",   es: "Medio tiempo",    pt: "Meio período"   },
+  wsFlexible: { en: "Flexible",    es: "Flexible",        pt: "Flexível"       },
+  wsRemote:   { en: "Remote",      es: "Remoto",          pt: "Remoto"         },
+  wsNone:     { en: "Not working", es: "Sin trabajo",     pt: "Sem trabalho"   },
+};

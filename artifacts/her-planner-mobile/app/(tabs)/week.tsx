@@ -5,20 +5,14 @@ import {
   useListTasks,
 } from "@workspace/api-client-react";
 import React from "react";
-import {
-  ActivityIndicator,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RingChart } from "@/components/RingChart";
 import { useColors } from "@/hooks/useColors";
+import { useLanguage } from "@/contexts/LanguageContext";
 
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_LETTERS_EN = ["S","M","T","W","T","F","S"];
 
 function getWeekDates(): Date[] {
   const today = new Date();
@@ -32,52 +26,33 @@ function getWeekDates(): Date[] {
   });
 }
 
-function toISO(d: Date) {
-  return d.toISOString().split("T")[0];
-}
+function toISO(d: Date) { return d.toISOString().split("T")[0]; }
 
 const PHASE_COLORS: Record<string, string> = {
-  menstrual: "#e07070",
-  follicular: "#70b070",
-  ovulation: "#d4a843",
-  luteal: "#9b7fc4",
-  unknown: "#b0b0b0",
+  menstrual: "#e07070", follicular: "#70b070", ovulation: "#d4a843", luteal: "#9b7fc4", unknown: "#b0b0b0",
 };
-
-const PHASE_LABEL: Record<string, string> = {
-  menstrual: "Menstrual",
-  follicular: "Follicular",
-  ovulation: "Ovulation",
-  luteal: "Luteal",
-  unknown: "—",
-};
-
 const PHASE_EMOJI: Record<string, string> = {
-  menstrual: "🌑",
-  follicular: "🌒",
-  ovulation: "🌕",
-  luteal: "🌖",
-  unknown: "🌙",
+  menstrual: "🌑", follicular: "🌒", ovulation: "🌕", luteal: "🌖", unknown: "🌙",
 };
-
-const CATEGORY_COLORS: Record<string, string> = {
-  work: "#c0788a",
-  personal: "#9b7fc4",
-  kids: "#d4a843",
-  health: "#70b070",
-  errands: "#d49843",
-  chores: "#7fb8c4",
+const CAT_COLORS: Record<string, string> = {
+  work: "#c0788a", personal: "#9b7fc4", kids: "#d4a843", health: "#70b070",
+  errands: "#d49843", chores: "#7fb8c4", food: "#a87c5f", "self-care": "#c47fbe",
+};
+const CAT_KEYS: Record<string, string> = {
+  work: "catWork", personal: "catPersonal", kids: "catKids", health: "catHealth",
+  errands: "catErrands", chores: "catChores", food: "catFood", "self-care": "catSelfCare",
 };
 
 export default function WeekScreen() {
   const colors = useColors();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === "web";
   const topPad = isWeb ? 67 : insets.top;
   const bottomPad = isWeb ? 34 : insets.bottom;
 
   const weekDates = getWeekDates();
-  const today = toISO(new Date());
+  const todayISO = toISO(new Date());
 
   const { data: tasks, isLoading: loadingTasks } = useListTasks({});
   const { data: summary } = useGetTasksSummary();
@@ -86,11 +61,7 @@ export default function WeekScreen() {
 
   const contextByDate = React.useMemo(() => {
     const map: Record<string, { energy?: number | null }> = {};
-    if (contexts) {
-      for (const ctx of contexts) {
-        map[ctx.date] = { energy: ctx.energyLevel };
-      }
-    }
+    if (contexts) for (const ctx of contexts) map[ctx.date] = { energy: ctx.energyLevel };
     return map;
   }, [contexts]);
 
@@ -115,64 +86,36 @@ export default function WeekScreen() {
       contentContainerStyle={{ paddingTop: topPad + 16, paddingBottom: bottomPad + 24 }}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={[s.heading, { color: colors.foreground, paddingHorizontal: 20 }]}>This Week</Text>
+      <Text style={[s.heading, { color: colors.foreground, paddingHorizontal: 20 }]}>{t("thisWeek")}</Text>
 
-      {/* ─── Task Ring Charts ─── */}
+      {/* Rings */}
       <View style={[s.ringCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[s.cardTitle, { color: colors.foreground }]}>Task Progress</Text>
+        <Text style={[s.cardTitle, { color: colors.foreground }]}>{t("taskProgress")}</Text>
         <View style={s.ringsRow}>
-          <RingChart
-            completed={summary?.today?.completed ?? 0}
-            total={summary?.today?.total ?? 0}
-            size={88}
-            strokeWidth={8}
-            color={colors.primary}
-            bgColor={colors.muted}
-            label="Today"
-            labelColor={colors.foreground}
-            mutedColor={colors.mutedForeground}
-          />
+          <RingChart completed={summary?.today?.completed ?? 0} total={summary?.today?.total ?? 0} size={88} strokeWidth={8} color={colors.primary} bgColor={colors.muted} label={t("today")} labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
           <View style={[s.ringDiv, { backgroundColor: colors.border }]} />
-          <RingChart
-            completed={summary?.week?.completed ?? 0}
-            total={summary?.week?.total ?? 0}
-            size={88}
-            strokeWidth={8}
-            color="#9b7fc4"
-            bgColor={colors.muted}
-            label="Week"
-            labelColor={colors.foreground}
-            mutedColor={colors.mutedForeground}
-          />
+          <RingChart completed={summary?.week?.completed ?? 0} total={summary?.week?.total ?? 0} size={88} strokeWidth={8} color="#9b7fc4" bgColor={colors.muted} label={t("week")} labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
           <View style={[s.ringDiv, { backgroundColor: colors.border }]} />
-          <RingChart
-            completed={summary?.month?.completed ?? 0}
-            total={summary?.month?.total ?? 0}
-            size={88}
-            strokeWidth={8}
-            color="#d4a843"
-            bgColor={colors.muted}
-            label="Month"
-            labelColor={colors.foreground}
-            mutedColor={colors.mutedForeground}
-          />
+          <RingChart completed={summary?.month?.completed ?? 0} total={summary?.month?.total ?? 0} size={88} strokeWidth={8} color="#d4a843" bgColor={colors.muted} label={t("month")} labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
         </View>
       </View>
 
-      {/* ─── Cycle Phase ─── */}
+      {/* Phase card */}
       <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: phaseColor }]}>
         <View style={s.phaseRow}>
           <Text style={s.phaseEmoji}>{PHASE_EMOJI[phaseKey]}</Text>
           <View style={{ flex: 1 }}>
-            <Text style={[s.phaseLabel, { color: phaseColor }]}>{PHASE_LABEL[phaseKey]}</Text>
+            <Text style={[s.phaseLabel, { color: phaseColor }]}>
+              {t(`phase${phaseKey.charAt(0).toUpperCase() + phaseKey.slice(1)}` as "phaseMenstrual")}
+            </Text>
             {phase?.dayInCycle != null && (
-              <Text style={[s.phaseSub, { color: colors.mutedForeground }]}>Day {phase.dayInCycle} of cycle</Text>
+              <Text style={[s.phaseSub, { color: colors.mutedForeground }]}>{t("dayOfCycle", { n: phase.dayInCycle })}</Text>
             )}
           </View>
           {phase?.nextPeriodIn != null && (
             <View style={[s.nextPill, { backgroundColor: phaseColor + "22" }]}>
-              <Text style={[s.nextPillLabel, { color: phaseColor }]}>next period</Text>
-              <Text style={[s.nextPillDays, { color: phaseColor }]}>in {phase.nextPeriodIn}d</Text>
+              <Text style={[s.nextPillLabel, { color: phaseColor }]}>{t("nextPeriod")}</Text>
+              <Text style={[s.nextPillDays, { color: phaseColor }]}>{t("inDays", { n: phase.nextPeriodIn })}</Text>
             </View>
           )}
         </View>
@@ -181,66 +124,49 @@ export default function WeekScreen() {
         )}
       </View>
 
-      {/* ─── Week Calendar + Energy ─── */}
+      {/* Week calendar */}
       <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[s.cardTitle, { color: colors.foreground }]}>Week at a glance</Text>
+        <Text style={[s.cardTitle, { color: colors.foreground }]}>{t("weekAtGlance")}</Text>
         <View style={s.weekGrid}>
           {weekDates.map((d, i) => {
             const iso = toISO(d);
-            const isToday = iso === today;
+            const isToday = iso === todayISO;
             const energy = contextByDate[iso]?.energy ?? 0;
             const barH = energy > 0 ? (energy / 5) * 44 : 0;
             return (
               <View key={i} style={s.dayCol}>
                 <Text style={[s.dayLetter, { color: isToday ? colors.primary : colors.mutedForeground }]}>
-                  {DAY_NAMES[d.getDay()].slice(0, 1)}
+                  {DAY_LETTERS_EN[d.getDay()]}
                 </Text>
-                <View
-                  style={[
-                    s.dayBubble,
-                    isToday
-                      ? { backgroundColor: colors.primary }
-                      : { backgroundColor: "transparent" },
-                  ]}
-                >
-                  <Text style={[s.dayNum, { color: isToday ? colors.primaryForeground : colors.foreground }]}>
-                    {d.getDate()}
-                  </Text>
+                <View style={[s.dayBubble, isToday ? { backgroundColor: colors.primary } : { backgroundColor: "transparent" }]}>
+                  <Text style={[s.dayNum, { color: isToday ? colors.primaryForeground : colors.foreground }]}>{d.getDate()}</Text>
                 </View>
                 <View style={[s.energyTrack, { backgroundColor: colors.muted }]}>
-                  {barH > 0 && (
-                    <View
-                      style={[
-                        s.energyBar,
-                        { height: barH, backgroundColor: colors.primary + "cc" },
-                      ]}
-                    />
-                  )}
+                  {barH > 0 && <View style={[s.energyBar, { height: barH, backgroundColor: colors.primary + "cc" }]} />}
                 </View>
               </View>
             );
           })}
         </View>
-        <Text style={[s.barNote, { color: colors.mutedForeground }]}>Energy levels logged this week</Text>
+        <Text style={[s.barNote, { color: colors.mutedForeground }]}>{t("energyLogged")}</Text>
       </View>
 
-      {/* ─── By Category ─── */}
+      {/* By Category */}
       {Object.keys(tasksByCategory).length > 0 && (
         <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[s.cardTitle, { color: colors.foreground }]}>By Category</Text>
+          <Text style={[s.cardTitle, { color: colors.foreground }]}>{t("byCategory")}</Text>
           {Object.entries(tasksByCategory).map(([cat, catTasks]) => {
             if (!catTasks) return null;
             const done = catTasks.filter((t) => t.completed).length;
             const total = catTasks.length;
             const pct = total > 0 ? done / total : 0;
-            const clr = CATEGORY_COLORS[cat] ?? colors.primary;
+            const clr = CAT_COLORS[cat] ?? colors.primary;
+            const labelKey = CAT_KEYS[cat] ?? "catPersonal";
             return (
               <View key={cat} style={s.catRow}>
                 <View style={s.catLabelRow}>
                   <View style={[s.catDot, { backgroundColor: clr }]} />
-                  <Text style={[s.catName, { color: colors.foreground }]}>
-                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                  </Text>
+                  <Text style={[s.catName, { color: colors.foreground }]}>{t(labelKey)}</Text>
                   <Text style={[s.catCount, { color: colors.mutedForeground }]}>{done}/{total}</Text>
                 </View>
                 <View style={[s.catTrack, { backgroundColor: colors.muted }]}>
@@ -252,11 +178,7 @@ export default function WeekScreen() {
         </View>
       )}
 
-      {loadingTasks && (
-        <View style={s.loading}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
-      )}
+      {loadingTasks && <View style={s.loading}><ActivityIndicator color={colors.primary} /></View>}
     </ScrollView>
   );
 }
