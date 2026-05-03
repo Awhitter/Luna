@@ -2,6 +2,7 @@ import {
   useCreateProfile,
   useGetCheckinStreak,
   useGetProfile,
+  useListDailyContexts,
   useUpdateProfile,
 } from "@workspace/api-client-react";
 import * as Haptics from "expo-haptics";
@@ -38,6 +39,7 @@ export default function ProfileScreen() {
 
   const { data: profile, isLoading } = useGetProfile();
   const { data: streak } = useGetCheckinStreak();
+  const { data: ctxList } = useListDailyContexts({ limit: 35 });
   const updateProfile = useUpdateProfile();
   const createProfile = useCreateProfile();
 
@@ -143,6 +145,14 @@ export default function ProfileScreen() {
               </View>
             </View>
           </View>
+        </View>
+      )}
+
+      {/* ── Check-in heatmap ── */}
+      {ctxList != null && (
+        <View style={[s.heatmapCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[s.heatmapTitle, { color: colors.mutedForeground }]}>{t("heatmapTitle")}</Text>
+          <CheckinHeatmap ctxDates={ctxList.map((c) => c.date)} colors={colors} />
         </View>
       )}
 
@@ -327,6 +337,60 @@ export default function ProfileScreen() {
   );
 }
 
+function CheckinHeatmap({
+  ctxDates,
+  colors,
+}: {
+  ctxDates: (string | null | undefined)[];
+  colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
+}) {
+  const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
+  const today = new Date();
+  const days: { dateStr: string; checked: boolean }[] = [];
+  // Build last 28 days ending today
+  for (let i = 27; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().split("T")[0]!;
+    days.push({ dateStr, checked: ctxDates.includes(dateStr) });
+  }
+  // Pad front so the grid starts on Monday
+  const firstDow = (new Date(days[0]!.dateStr).getDay() + 6) % 7; // 0=Mon
+  const padded: (typeof days[0] | null)[] = [
+    ...Array(firstDow).fill(null),
+    ...days,
+  ];
+  return (
+    <View>
+      <View style={s.heatmapDayLabels}>
+        {DAY_LABELS.map((l, i) => (
+          <Text key={i} style={[s.heatmapDayLabel, { color: colors.mutedForeground }]}>{l}</Text>
+        ))}
+      </View>
+      <View style={s.heatmapGrid}>
+        {padded.map((d, i) =>
+          d === null ? (
+            <View key={`pad-${i}`} style={[s.heatmapDot, { backgroundColor: "transparent" }]} />
+          ) : (
+            <View
+              key={d.dateStr}
+              style={[
+                s.heatmapDot,
+                {
+                  backgroundColor: d.checked
+                    ? colors.primary
+                    : colors.muted,
+                  opacity: d.checked ? 1 : 0.5,
+                },
+              ]}
+            />
+          )
+        )}
+      </View>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
   content: { paddingHorizontal: 20 },
   heading: { fontSize: 28, fontFamily: "PlusJakartaSans_700Bold", marginBottom: 28 },
@@ -354,7 +418,13 @@ const s = StyleSheet.create({
   kidNumText: { fontSize: 16, fontFamily: "PlusJakartaSans_600SemiBold" },
   saveBtn: { paddingVertical: 16, borderRadius: 14, alignItems: "center", marginTop: 8 },
   saveBtnText: { fontSize: 16, fontFamily: "PlusJakartaSans_600SemiBold" },
-  streakCard: { borderWidth: 1, borderRadius: 18, padding: 16, marginBottom: 28 },
+  heatmapCard: { borderWidth: 1, borderRadius: 18, padding: 16, marginBottom: 20 },
+  heatmapTitle: { fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold", letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 14 },
+  heatmapGrid: { flexDirection: "row", flexWrap: "wrap", gap: 5 },
+  heatmapDayLabels: { flexDirection: "row", marginBottom: 6, gap: 5 },
+  heatmapDayLabel: { width: 28, fontSize: 9, fontFamily: "PlusJakartaSans_500Medium", textAlign: "center" },
+  heatmapDot: { width: 28, height: 28, borderRadius: 7 },
+  streakCard: { borderWidth: 1, borderRadius: 18, padding: 16, marginBottom: 20 },
   streakCardTitle: { fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold", letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 14 },
   streakRow: { flexDirection: "row", gap: 12 },
   streakHero: { flex: 1, borderRadius: 16, padding: 14, alignItems: "center", justifyContent: "center" },

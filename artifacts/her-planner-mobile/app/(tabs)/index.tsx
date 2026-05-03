@@ -35,7 +35,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RingChart } from "@/components/RingChart";
 import { useColors } from "@/hooks/useColors";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { PHASE_COLORS, PHASE_EMOJI } from "@/constants/cycle";
+import { PHASE_COLORS, PHASE_EMOJI, SYMPTOM_KEYS } from "@/constants/cycle";
 import { STORAGE_KEYS } from "@/constants/storage";
 
 interface SuggestedTask {
@@ -116,6 +116,7 @@ export default function TodayScreen() {
   const [checkinMood, setCheckinMood] = useState(0);
   const [checkinEnergy, setCheckinEnergy] = useState(0);
   const [checkinSleep, setCheckinSleep] = useState(7);
+  const [checkinSymptoms, setCheckinSymptoms] = useState<string[]>([]);
   const [checkinExpanded, setCheckinExpanded] = useState(false);
   const [newTaskText, setNewTaskText] = useState("");
   const initialized = useRef(false);
@@ -178,6 +179,9 @@ export default function TodayScreen() {
           mood: MOOD_EN[checkinMood] ?? undefined,
         },
       });
+      const symKey = STORAGE_KEYS.todaySymptoms(today);
+      await AsyncStorage.setItem(symKey, JSON.stringify(checkinSymptoms));
+      setTodaySymptoms(checkinSymptoms);
       refetchCtx();
       setCheckinExpanded(false);
     } catch {}
@@ -327,10 +331,16 @@ export default function TodayScreen() {
             <Text style={[s.greetingText, { color: colors.foreground, flex: 1 }]}>
               {firstName ? `${t("welcomeBack")} ${firstName} 👋` : "Her Planner"}
             </Text>
-            {streak != null && streak.currentStreak > 0 && (
-              <View style={[s.streakBadge, { backgroundColor: colors.primary + "18" }]}>
-                <Text style={[s.streakBadgeText, { color: colors.primary }]}>
-                  {t("streakBadge", { n: String(streak.currentStreak) })}
+            {streak != null && (
+              <View style={[s.streakBadge, {
+                backgroundColor: streak.currentStreak > 0 ? colors.primary + "18" : colors.muted,
+              }]}>
+                <Text style={[s.streakBadgeText, {
+                  color: streak.currentStreak > 0 ? colors.primary : colors.mutedForeground,
+                }]}>
+                  {streak.currentStreak > 0
+                    ? t("streakBadge", { n: String(streak.currentStreak) })
+                    : t("streakBadgeZero")}
                 </Text>
               </View>
             )}
@@ -343,12 +353,19 @@ export default function TodayScreen() {
             {!checkinExpanded ? (
               <Pressable
                 style={s.checkinRow}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCheckinExpanded(true); }}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setCheckinSymptoms([...todaySymptoms]);
+                  setCheckinExpanded(true);
+                }}
               >
                 <Text style={s.checkinSun}>☀️</Text>
-                <Text style={[s.checkinBannerText, { color: colors.mutedForeground }]}>{t("checkinBanner")}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.checkinBannerText, { color: colors.foreground }]}>{t("checkinBanner")}</Text>
+                  <Text style={[s.checkinBannerNudge, { color: colors.mutedForeground }]}>{t("lunaNudge")}</Text>
+                </View>
                 <View style={[s.checkinBannerBtn, { backgroundColor: colors.primary }]}>
-                  <Text style={[s.checkinBannerBtnTxt, { color: colors.primaryForeground }]}>{t("checkinStart")}</Text>
+                  <Text style={[s.checkinBannerBtnTxt, { color: colors.primaryForeground }]}>{t("checkinCheckIn")}</Text>
                 </View>
               </Pressable>
             ) : (
@@ -356,9 +373,11 @@ export default function TodayScreen() {
                 mood={checkinMood}
                 energy={checkinEnergy}
                 sleep={checkinSleep}
+                symptoms={checkinSymptoms}
                 onMood={setCheckinMood}
                 onEnergy={setCheckinEnergy}
                 onSleep={setCheckinSleep}
+                onSymptoms={setCheckinSymptoms}
                 onSave={handleWizardSave}
                 onClose={() => setCheckinExpanded(false)}
                 isPending={createDailyContext.isPending}
@@ -366,10 +385,12 @@ export default function TodayScreen() {
                 moodDisp={MOOD_DISP}
                 energyDisp={ENERGY_DISP}
                 sleepOptions={SLEEP_OPTIONS}
+                symptomKeys={SYMPTOM_KEYS.map((k) => ({ key: k, label: t(k) }))}
                 tCheckinTitle={t("checkinTitle")}
                 tMood={t("checkinMood")}
                 tEnergy={t("checkinEnergy")}
                 tSleep={t("checkinSleep")}
+                tSymptoms={t("symptomsOptional")}
                 tLater={t("checkinLater")}
                 tSave={t("checkinSave")}
               />
@@ -490,9 +511,6 @@ export default function TodayScreen() {
 
       {/* ─── Plan with Luna button ─── */}
       <View style={[s.lunaBar, { paddingBottom: bottomPad + 6, borderTopColor: colors.border, backgroundColor: colors.background }]}>
-        {!todayCtx && (
-          <Text style={[s.lunaNudge, { color: colors.mutedForeground }]}>{t("lunaNudge")}</Text>
-        )}
         <Pressable
           style={[s.lunaBtn, { backgroundColor: colors.primary }]}
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowLuna(true); }}
@@ -595,19 +613,26 @@ export default function TodayScreen() {
 // ─── CheckinExpanded ──────────────────────────────────────────────────────────
 
 function CheckinExpanded({
-  mood, energy, sleep,
-  onMood, onEnergy, onSleep,
+  mood, energy, sleep, symptoms,
+  onMood, onEnergy, onSleep, onSymptoms,
   onSave, onClose, isPending, colors,
-  moodDisp, energyDisp, sleepOptions,
-  tCheckinTitle, tMood, tEnergy, tSleep, tLater, tSave,
+  moodDisp, energyDisp, sleepOptions, symptomKeys,
+  tCheckinTitle, tMood, tEnergy, tSleep, tSymptoms, tLater, tSave,
 }: {
-  mood: number; energy: number; sleep: number;
+  mood: number; energy: number; sleep: number; symptoms: string[];
   onMood: (v: number) => void; onEnergy: (v: number) => void; onSleep: (v: number) => void;
+  onSymptoms: (v: string[]) => void;
   onSave: () => void; onClose: () => void; isPending: boolean;
   colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
   moodDisp: string[]; energyDisp: string[]; sleepOptions: number[];
-  tCheckinTitle: string; tMood: string; tEnergy: string; tSleep: string; tLater: string; tSave: string;
+  symptomKeys: { key: string; label: string }[];
+  tCheckinTitle: string; tMood: string; tEnergy: string; tSleep: string;
+  tSymptoms: string; tLater: string; tSave: string;
 }) {
+  function toggleSym(key: string) {
+    Haptics.selectionAsync();
+    onSymptoms(symptoms.includes(key) ? symptoms.filter((k) => k !== key) : [...symptoms, key]);
+  }
   return (
     <View style={ce.container}>
       <View style={ce.titleRow}>
@@ -649,6 +674,23 @@ function CheckinExpanded({
               <Text style={[ce.btnNum, { color: sleep === h ? "#fff" : colors.foreground }]}>{h}h</Text>
             </Pressable>
           ))}
+        </View>
+      </View>
+      <View style={ce.row}>
+        <Text style={[ce.rowLabel, { color: colors.mutedForeground }]}>{tSymptoms}</Text>
+        <View style={ce.symChips}>
+          {symptomKeys.map((s) => {
+            const sel = symptoms.includes(s.key);
+            return (
+              <Pressable
+                key={s.key}
+                onPress={() => toggleSym(s.key)}
+                style={[ce.symChip, { backgroundColor: sel ? colors.primary + "22" : colors.muted, borderColor: sel ? colors.primary : "transparent", borderWidth: 1 }]}
+              >
+                <Text style={[ce.symChipText, { color: sel ? colors.primary : colors.foreground }]}>{s.label}</Text>
+              </Pressable>
+            );
+          })}
         </View>
       </View>
       <View style={ce.saveRow}>
@@ -855,9 +897,10 @@ const s = StyleSheet.create({
   seeAll: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold" },
   // Check-in
   checkinRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  checkinSun: { fontSize: 22 },
-  checkinBannerText: { flex: 1, fontSize: 14, fontFamily: "PlusJakartaSans_400Regular" },
-  checkinBannerBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 100 },
+  checkinSun: { fontSize: 22, flexShrink: 0 },
+  checkinBannerText: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold" },
+  checkinBannerNudge: { fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", marginTop: 2, lineHeight: 15 },
+  checkinBannerBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 100, flexShrink: 0 },
   checkinBannerBtnTxt: { fontSize: 12, fontFamily: "PlusJakartaSans_600SemiBold" },
   // Phase pill
   phasePill: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100, alignSelf: "flex-start", marginBottom: 12 },
@@ -935,6 +978,9 @@ const ce = StyleSheet.create({
   skipTxt: { fontSize: 13, fontFamily: "PlusJakartaSans_500Medium" },
   saveBtn: { flex: 2, paddingVertical: 10, borderRadius: 12, alignItems: "center" },
   saveTxt: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold" },
+  symChips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  symChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 100 },
+  symChipText: { fontSize: 12, fontFamily: "PlusJakartaSans_500Medium" },
 });
 
 const mb = StyleSheet.create({
