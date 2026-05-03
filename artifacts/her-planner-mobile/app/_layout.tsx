@@ -5,17 +5,19 @@ import {
   PlusJakartaSans_700Bold,
   useFonts,
 } from "@expo-google-fonts/plus-jakarta-sans";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { setBaseUrl } from "@workspace/api-client-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Redirect, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { STORAGE_KEYS } from "@/constants/storage";
 
 setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
 
@@ -31,10 +33,12 @@ const queryClient = new QueryClient({
   },
 });
 
-function RootLayoutNav() {
+function RootLayoutNav({ needsOnboarding }: { needsOnboarding: boolean }) {
   return (
-    <Stack screenOptions={{ headerBackTitle: "Back" }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)"      options={{ headerShown: false }} />
+      <Stack.Screen name="onboarding"  options={{ headerShown: false, gestureEnabled: false }} />
+      {needsOnboarding && <Redirect href="/onboarding" />}
     </Stack>
   );
 }
@@ -46,14 +50,26 @@ export default function RootLayout() {
     PlusJakartaSans_600SemiBold,
     PlusJakartaSans_700Bold,
   });
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [needsOnboarding,   setNeedsOnboarding]   = useState(false);
 
   useEffect(() => {
-    if (fontsLoaded || fontError) {
+    Promise.all([
+      AsyncStorage.getItem(STORAGE_KEYS.onboardingComplete),
+      AsyncStorage.getItem(STORAGE_KEYS.lunaConversation),
+    ]).then(([done, conv]) => {
+      setNeedsOnboarding(!done && !conv);
+      setOnboardingChecked(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    if ((fontsLoaded || fontError) && onboardingChecked) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError, onboardingChecked]);
 
-  if (!fontsLoaded && !fontError) return null;
+  if ((!fontsLoaded && !fontError) || !onboardingChecked) return null;
 
   return (
     <SafeAreaProvider>
@@ -62,7 +78,7 @@ export default function RootLayout() {
           <LanguageProvider>
             <GestureHandlerRootView>
               <KeyboardProvider>
-                <RootLayoutNav />
+                <RootLayoutNav needsOnboarding={needsOnboarding} />
               </KeyboardProvider>
             </GestureHandlerRootView>
           </LanguageProvider>

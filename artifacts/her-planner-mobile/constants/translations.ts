@@ -213,4 +213,22 @@ export const T: Record<string, TR> = {
   periodLengthLabel:{ en: "PERIOD LENGTH", es: "DURACIÓN DEL PERÍODO", pt: "DURAÇÃO DO PERÍODO" },
   periodLengthSub:  { en: "How many days your period typically lasts", es: "Cuántos días dura tu período normalmente", pt: "Quantos dias seu período normalmente dura" },
   cycleDays:        { en: "{n} days", es: "{n} días", pt: "{n} dias" },
+
+  // ── Onboarding ────────────────────────────────────────────────────────────
+  onbWelcome:       { en: "Hi, I'm Luna 🌙",              es: "Hola, soy Luna 🌙",              pt: "Oi, eu sou a Luna 🌙"             },
+  onbSubtitle:      { en: "Your AI companion for daily life and cycle wellness. Let's get you set up in 3 quick steps.", es: "Tu compañera IA para la vida diaria y el bienestar del ciclo. Configuremos todo en 3 pasos.", pt: "Sua companheira IA para a vida diária e o bem-estar do ciclo. Vamos configurar em 3 passos rápidos." },
+  onbNameTitle:     { en: "What should I call you?",      es: "¿Cómo debo llamarte?",           pt: "Como devo te chamar?"             },
+  onbNameHint:      { en: "Your first name",              es: "Tu nombre",                      pt: "Seu nome"                        },
+  onbNext:          { en: "Continue",                     es: "Continuar",                      pt: "Continuar"                       },
+  onbPeriodTitle:   { en: "When did your last period start?", es: "¿Cuándo empezó tu último período?", pt: "Quando foi o início do seu último período?" },
+  onbPeriodSub:     { en: "This helps me predict your cycle phases and give you better support.", es: "Esto me ayuda a predecir tus fases del ciclo.", pt: "Isso me ajuda a prever suas fases do ciclo." },
+  onbToday:         { en: "Today",                        es: "Hoy",                            pt: "Hoje"                            },
+  onbYesterday:     { en: "Yesterday",                    es: "Ayer",                           pt: "Ontem"                           },
+  onbDaysAgo:       { en: "{n} days ago",                 es: "hace {n} días",                  pt: "{n} dias atrás"                  },
+  onbNotSure:       { en: "Not sure / Skip",              es: "No sé / Omitir",                 pt: "Não sei / Pular"                 },
+  onbCycleTitle:    { en: "Your cycle",                   es: "Tu ciclo",                       pt: "Seu ciclo"                       },
+  onbCycleSub:      { en: "You can always update these in your profile later.", es: "Puedes actualizarlos en tu perfil después.", pt: "Você pode atualizá-los no seu perfil depois." },
+  onbFinish:        { en: "Let's go!",                    es: "¡Vamos!",                        pt: "Vamos lá!"                       },
+  onbSaving:        { en: "Setting up Luna…",             es: "Configurando a Luna…",           pt: "Configurando a Luna…"            },
+  onbStep:          { en: "Step {n} of 3",                es: "Paso {n} de 3",                  pt: "Passo {n} de 3"                  },
 };

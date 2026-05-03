@@ -58,6 +58,21 @@ function uid(): string {
   return `msg-${Date.now()}-${msgCounter}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+type MutateConv = (args: { data: { title: string } }) => Promise<{ id: number }>;
+let convInitPromise: Promise<number> | null = null;
+async function resolveConversationId(mutate: MutateConv): Promise<number> {
+  if (convInitPromise) return convInitPromise;
+  convInitPromise = (async () => {
+    const stored = await AsyncStorage.getItem(STORAGE_KEYS.lunaConversation);
+    if (stored) return parseInt(stored, 10);
+    const conv = await mutate({ data: { title: "Luna Chat" } });
+    await AsyncStorage.setItem(STORAGE_KEYS.lunaConversation, String(conv.id));
+    return conv.id;
+  })();
+  convInitPromise.catch(() => { convInitPromise = null; });
+  return convInitPromise;
+}
+
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const DAYS   = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
@@ -103,7 +118,6 @@ export default function TodayScreen() {
   const [checkinExpanded, setCheckinExpanded] = useState(false);
   const [newTaskText, setNewTaskText] = useState("");
   const initialized = useRef(false);
-  const convInitLockRef = useRef(false);
 
   const createConversation = useCreateOpenaiConversation();
   const createDailyContext = useCreateDailyContext();
@@ -136,7 +150,9 @@ export default function TodayScreen() {
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
-    initConversation();
+    resolveConversationId(createConversation.mutateAsync)
+      .then((id) => setConversationId(id))
+      .catch(() => {});
     loadTodaySymptoms();
   }, []);
 
@@ -146,23 +162,6 @@ export default function TodayScreen() {
       const stored = await AsyncStorage.getItem(key);
       if (stored) setTodaySymptoms(JSON.parse(stored) as string[]);
     } catch {}
-  }
-
-  async function initConversation() {
-    if (convInitLockRef.current) return;
-    convInitLockRef.current = true;
-    try {
-      const storedId = await AsyncStorage.getItem(STORAGE_KEYS.lunaConversation);
-      if (storedId) {
-        setConversationId(parseInt(storedId, 10));
-      } else {
-        const conv = await createConversation.mutateAsync({ data: { title: "Luna Chat" } });
-        setConversationId(conv.id);
-        await AsyncStorage.setItem(STORAGE_KEYS.lunaConversation, String(conv.id));
-      }
-    } catch {
-      convInitLockRef.current = false;
-    }
   }
 
   async function handleWizardSave() {

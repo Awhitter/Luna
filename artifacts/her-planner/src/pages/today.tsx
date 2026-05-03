@@ -38,6 +38,8 @@ const MOOD_KEYS = ["happy", "calm", "tired", "anxious", "motivated", "overwhelme
 
 const WIZARD_STEP_KEYS = ["sleep", "energy", "mood"] as const;
 
+let webConvInitPromise: Promise<number> | null = null;
+
 const TODAY_STR = new Date().toISOString().split("T")[0];
 const WIZARD_SHOWN_KEY = "luna-wizard-shown";
 
@@ -135,25 +137,32 @@ export default function TodayPage() {
   }, [profile, profileLoading, setLocation]);
 
   useEffect(() => {
-    if (profile && conversations.length > 0 && !conversationId) {
+    if (!profile) return;
+    if (conversations.length > 0 && !conversationId) {
       setConversationId(conversations[0].id);
+      return;
     }
-  }, [profile, conversations, conversationId]);
-
-  useEffect(() => {
-    if (profile && conversations.length === 0 && !conversationId) {
-      createConversation.mutate(
-        { data: { title: "My Day" } },
-        {
-          onSuccess: (conv) => {
-            setConversationId(conv.id);
-            const hour = new Date().getHours();
-            const greet = hour < 12 ? t.greetings.morning : hour < 17 ? t.greetings.afternoon : t.greetings.evening;
-            const hint = t.greetings.phaseHints[cyclePhase?.phase ?? "unknown"];
-            setMessages([{ role: "assistant", content: `${greet}, ${profile.name}! ${hint}` }]);
-          },
-        }
-      );
+    if (conversations.length === 0 && !conversationId) {
+      if (webConvInitPromise) return;
+      webConvInitPromise = new Promise((resolve, reject) => {
+        createConversation.mutate(
+          { data: { title: "My Day" } },
+          {
+            onSuccess: (conv) => {
+              setConversationId(conv.id);
+              const hour = new Date().getHours();
+              const greet = hour < 12 ? t.greetings.morning : hour < 17 ? t.greetings.afternoon : t.greetings.evening;
+              const hint = t.greetings.phaseHints[cyclePhase?.phase ?? "unknown"];
+              setMessages([{ role: "assistant", content: `${greet}, ${profile.name}! ${hint}` }]);
+              resolve(conv.id);
+            },
+            onError: (err) => {
+              webConvInitPromise = null;
+              reject(err);
+            },
+          }
+        );
+      });
     }
   }, [profile, conversations]);
 
