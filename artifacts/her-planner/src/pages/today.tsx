@@ -21,6 +21,18 @@ import { cn } from "@/lib/utils";
 
 type ChatMessage = { role: "user" | "assistant"; content: string; streaming?: boolean };
 
+type TaskSuggestion = {
+  title: string;
+  category: string;
+  priority: string;
+  reason: string;
+};
+
+type SuggestionsData = {
+  message: string;
+  suggestions: TaskSuggestion[];
+};
+
 const categoryColors: Record<string, string> = {
   work: "bg-blue-100 text-blue-700",
   home: "bg-amber-100 text-amber-700",
@@ -33,7 +45,7 @@ const categoryColors: Record<string, string> = {
 const MOODS = ["happy", "calm", "tired", "anxious", "motivated", "overwhelmed", "grateful", "sad"] as const;
 
 const WIZARD_STEPS = [
-  { id: 1, key: "sleep" as const, emoji: "🌙", question: "How did you sleep?" , subtitle: "Hours last night" },
+  { id: 1, key: "sleep" as const, emoji: "🌙", question: "How did you sleep?", subtitle: "Hours last night" },
   { id: 2, key: "energy" as const, emoji: "⚡", question: "Energy level?", subtitle: "How's your body feeling?" },
   { id: 3, key: "mood" as const, emoji: "🌸", question: "What's your mood?", subtitle: "Be honest — this is just for you" },
 ];
@@ -42,10 +54,10 @@ function getGreeting(name: string, phase?: string) {
   const hour = new Date().getHours();
   const t = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const hints: Record<string, string> = {
-    menstrual: "Take it gentle today — rest is productive too.",
-    follicular: "Your energy is building. Let's make the most of it!",
-    ovulation: "You're in your power. Big things today?",
-    luteal: "Winding down beautifully. Let's keep it manageable.",
+    menstrual: "Rest is on the list too — I've got you.",
+    follicular: "Your energy's building. Let's use it well!",
+    ovulation: "You're in your power today. Big things ahead?",
+    luteal: "Let's keep it gentle and manageable today.",
     unknown: "Let's make today count, together.",
   };
   return `${t}, ${name}! ${hints[phase ?? "unknown"]}`;
@@ -81,6 +93,12 @@ export default function TodayPage() {
   const [wizardStep, setWizardStep] = useState(1);
   const [wizardData, setWizardData] = useState({ sleepHours: 7, energyLevel: 7, mood: "" });
   const [wizardAutoOpened, setWizardAutoOpened] = useState(false);
+
+  // Luna suggestions state
+  const [suggestions, setSuggestions] = useState<SuggestionsData | null>(null);
+  const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [addedSuggestions, setAddedSuggestions] = useState<Set<number>>(new Set());
 
   // Auto-open wizard once per day if no check-in yet
   useEffect(() => {
@@ -128,7 +146,22 @@ export default function TodayPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Save wizard data (create or update)
+  const fetchSuggestions = useCallback(async () => {
+    setSuggestionsLoading(true);
+    setSuggestionsDismissed(false);
+    setAddedSuggestions(new Set());
+    try {
+      const res = await fetch("/api/openai/suggest-tasks", { method: "POST" });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json() as SuggestionsData;
+      setSuggestions(data);
+    } catch {
+      // silently fail — suggestions are a bonus
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  }, []);
+
   const saveWizard = () => {
     const today = new Date().toISOString().split("T")[0];
     const payload = {
@@ -138,17 +171,16 @@ export default function TodayPage() {
       mood: wizardData.mood || undefined,
     };
 
-    {
-      createDailyContext.mutate(
-        { data: payload },
-        {
-          onSuccess: () => {
-            setWizardOpen(false);
-            queryClient.invalidateQueries({ queryKey: getGetTodayContextQueryKey() });
-          },
-        }
-      );
-    }
+    createDailyContext.mutate(
+      { data: payload },
+      {
+        onSuccess: () => {
+          setWizardOpen(false);
+          queryClient.invalidateQueries({ queryKey: getGetTodayContextQueryKey() });
+          fetchSuggestions();
+        },
+      }
+    );
   };
 
   const handleWizardNext = () => {
@@ -167,6 +199,27 @@ export default function TodayPage() {
     });
     setWizardStep(startStep);
     setWizardOpen(true);
+  };
+
+  const addSuggestedTask = (suggestion: TaskSuggestion, index: number) => {
+    createTask.mutate(
+      {
+        data: {
+          title: suggestion.title,
+          category: suggestion.category,
+          priority: suggestion.priority as "low" | "medium" | "high",
+          view: "today",
+          aiSuggested: true,
+        },
+      },
+      {
+        onSuccess: () => {
+          setAddedSuggestions((prev) => new Set(prev).add(index));
+          queryClient.invalidateQueries({ queryKey: getListTasksQueryKey({ view: "today" }) });
+          queryClient.invalidateQueries({ queryKey: getGetTasksSummaryQueryKey() });
+        },
+      }
+    );
   };
 
   // AI chat
@@ -227,7 +280,7 @@ export default function TodayPage() {
       setMessages((prev) => { const u = [...prev]; u[u.length - 1] = { role: "assistant", content: displayText, streaming: false }; return u; });
       queryClient.invalidateQueries({ queryKey: getListTasksQueryKey({ view: "today" }) });
     } catch {
-      setMessages((prev) => { const u = [...prev]; u[u.length - 1] = { role: "assistant", content: "Sorry, I had trouble connecting. Try again?", streaming: false }; return u; });
+      setMessages((prev) => { const u = [...prev]; u[u.length - 1] = { role: "assistant", content: "Sorry, I had a little hiccup. Try again?", streaming: false }; return u; });
     } finally {
       setIsStreaming(false);
     }
@@ -263,6 +316,7 @@ export default function TodayPage() {
   const completedCount = tasks.filter((t) => t.completed).length;
   const totalCount = tasks.length;
   const currentWizardStep = WIZARD_STEPS[wizardStep - 1];
+  const showSuggestions = !suggestionsDismissed && (suggestionsLoading || suggestions !== null);
 
   return (
     <div className="flex flex-col h-full">
@@ -284,7 +338,7 @@ export default function TodayPage() {
         )}
       </header>
 
-      {/* Check-in summary row — tapping re-opens the wizard at that step */}
+      {/* Check-in summary row */}
       <div className="px-5 flex gap-2 mb-4 overflow-x-auto hide-scrollbar">
         <button
           onClick={() => openWizardManually(1)}
@@ -355,7 +409,8 @@ export default function TodayPage() {
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-3">
                 <Sparkles className="w-8 h-8 text-primary" />
               </div>
-              <p className="text-muted-foreground text-sm">Aria is here for you. Say hello!</p>
+              <p className="font-medium text-foreground text-sm mb-1">Luna is here for you ✨</p>
+              <p className="text-muted-foreground text-xs">Your best friend for getting things done.</p>
             </div>
           )}
           <div ref={messagesEndRef} />
@@ -368,7 +423,7 @@ export default function TodayPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Tell Aria what's on your mind..."
+              placeholder="Tell Luna what's on your mind..."
               className="flex-1 bg-transparent text-sm resize-none outline-none placeholder:text-muted-foreground min-h-[20px] max-h-24"
               rows={1}
             />
@@ -382,6 +437,87 @@ export default function TodayPage() {
           </div>
         </div>
       </div>
+
+      {/* Luna Suggestions Card */}
+      {showSuggestions && (
+        <div className="px-5 pb-3">
+          <div className="bg-gradient-to-br from-primary/8 to-primary/4 border border-primary/20 rounded-2xl p-4">
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                </div>
+                <span className="text-xs font-semibold text-primary">Luna suggests for today</span>
+              </div>
+              <button
+                onClick={() => setSuggestionsDismissed(true)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {suggestionsLoading ? (
+              <div className="flex items-center gap-2 py-2">
+                <div className="flex gap-1">
+                  {[0, 1, 2].map((i) => (
+                    <div
+                      key={i}
+                      className="w-1.5 h-1.5 rounded-full bg-primary/50 animate-bounce"
+                      style={{ animationDelay: `${i * 0.15}s` }}
+                    />
+                  ))}
+                </div>
+                <span className="text-xs text-muted-foreground">Luna is thinking about your day...</span>
+              </div>
+            ) : suggestions ? (
+              <>
+                <p className="text-xs text-foreground/70 mb-3 leading-relaxed">{suggestions.message}</p>
+                <div className="space-y-2">
+                  {suggestions.suggestions.map((s, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        "flex items-center gap-3 py-2 px-3 rounded-xl transition-all",
+                        addedSuggestions.has(i)
+                          ? "bg-primary/10 opacity-60"
+                          : "bg-card/80 hover:bg-card"
+                      )}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className={cn("text-sm font-medium truncate", addedSuggestions.has(i) && "line-through text-muted-foreground")}>
+                          {s.title}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{s.reason}</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium", categoryColors[s.category] || "bg-muted text-muted-foreground")}>
+                          {s.category}
+                        </span>
+                        <button
+                          onClick={() => addSuggestedTask(s, i)}
+                          disabled={addedSuggestions.has(i)}
+                          className={cn(
+                            "w-6 h-6 rounded-full flex items-center justify-center transition-all flex-shrink-0",
+                            addedSuggestions.has(i)
+                              ? "bg-primary/20 text-primary"
+                              : "bg-primary text-primary-foreground hover:scale-110 active:scale-95"
+                          )}
+                        >
+                          {addedSuggestions.has(i)
+                            ? <CheckCircle2 className="w-3.5 h-3.5" />
+                            : <Plus className="w-3.5 h-3.5" />
+                          }
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       {/* Today's tasks */}
       <div className="px-5 py-4 border-t border-border bg-card/50">
@@ -404,7 +540,7 @@ export default function TodayPage() {
 
         {tasks.length === 0 && !addingTask && (
           <p className="text-xs text-muted-foreground text-center py-3">
-            No tasks yet. Ask Aria to help plan your day!
+            No tasks yet. Ask Luna to help you plan your day!
           </p>
         )}
 
@@ -446,7 +582,6 @@ export default function TodayPage() {
       {/* Daily Check-in Wizard */}
       {wizardOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
-          {/* Blurred backdrop */}
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
           <div className="relative bg-card w-full max-w-md rounded-t-3xl px-6 pt-6 pb-10 animate-in slide-in-from-bottom-4 duration-300">
@@ -469,6 +604,14 @@ export default function TodayPage() {
               >
                 <X className="w-4 h-4" />
               </button>
+            </div>
+
+            {/* Luna header in wizard */}
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center">
+                <Sparkles className="w-3.5 h-3.5 text-primary" />
+              </div>
+              <span className="text-xs text-muted-foreground">Luna · Morning check-in</span>
             </div>
 
             {/* Step emoji & heading */}
@@ -510,7 +653,7 @@ export default function TodayPage() {
                       className={cn(
                         "py-3.5 rounded-2xl text-sm font-semibold border-2 transition-all",
                         wizardData.energyLevel === n
-                          ? "bg-primary text-primary-foreground border-primary scale-105 shadow-md"
+                          ? "bg-primary text-primary-foreaming border-primary scale-105 shadow-md"
                           : "bg-accent border-transparent text-foreground hover:border-primary/30"
                       )}
                     >
@@ -556,15 +699,15 @@ export default function TodayPage() {
             {/* Next / Save button */}
             <button
               onClick={handleWizardNext}
-              disabled={createDailyContext.isPending || updateDailyContext.isPending}
+              disabled={createDailyContext.isPending}
               className="w-full py-4 rounded-2xl bg-primary text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60 transition-all active:scale-[0.98]"
             >
               {wizardStep < 3 ? (
                 <>Continue <ChevronRight className="w-4 h-4" /></>
-              ) : createDailyContext.isPending || updateDailyContext.isPending ? (
+              ) : createDailyContext.isPending ? (
                 "Saving..."
               ) : (
-                "Start my day"
+                "Start my day ✨"
               )}
             </button>
 
