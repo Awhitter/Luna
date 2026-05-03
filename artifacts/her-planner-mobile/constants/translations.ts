@@ -140,6 +140,11 @@ export const T: Record<string, TR> = {
   // ── Cycle screen ──────────────────────────────────────────────────────────
   cycleTitle:      { en: "Cycle",            es: "Ciclo",               pt: "Ciclo"                },
   logBtn:          { en: "+ Log",            es: "+ Registrar",         pt: "+ Registrar"          },
+  addSymptoms:     { en: "Add Symptoms",     es: "Agregar Síntomas",    pt: "Adicionar Sintomas"   },
+  todaysSymptoms:  { en: "Today's Symptoms", es: "Síntomas de Hoy",     pt: "Sintomas de Hoje"     },
+  lunaNoteSymptoms:{ en: "Luna will consider your symptoms when planning your day", es: "Luna considerará tus síntomas al planificar tu día", pt: "Luna considerará seus sintomas ao planejar seu dia" },
+  noSymptomsYet:   { en: "No symptoms logged today — tap Add Symptoms", es: "Sin síntomas hoy — toca Agregar Síntomas", pt: "Nenhum sintoma hoje — toque em Adicionar Sintomas" },
+  howAreYouFeeling:{ en: "How are you feeling today?", es: "¿Cómo te sientes hoy?", pt: "Como você está se sentindo hoje?" },
   nextPeriodLabel: { en: "Next period",      es: "Próximo período",     pt: "Próximo período"      },
   phaseDay:        { en: "Day {n}",          es: "Día {n}",             pt: "Dia {n}"              },
   recommendations: { en: "RECOMMENDATIONS", es: "RECOMENDACIONES",     pt: "RECOMENDAÇÕES"        },

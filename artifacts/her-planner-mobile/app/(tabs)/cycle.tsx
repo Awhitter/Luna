@@ -1,10 +1,11 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   useCreateCycleEntry,
   useGetCurrentCyclePhase,
   useListCycleEntries,
 } from "@workspace/api-client-react";
 import * as Haptics from "expo-haptics";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -33,6 +34,10 @@ function formatEntryDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function todayKey() {
+  return `today-symptoms-${new Date().toISOString().split("T")[0]}`;
+}
+
 export default function CycleScreen() {
   const colors = useColors();
   const { t } = useLanguage();
@@ -45,14 +50,17 @@ export default function CycleScreen() {
   const [logType, setLogType] = useState<CreateCycleEntryBodyEntryType>("period_start");
   const [logSymptoms, setLogSymptoms] = useState<string[]>([]);
 
+  const [showSymptomPicker, setShowSymptomPicker] = useState(false);
+  const [pickerSymptoms, setPickerSymptoms] = useState<string[]>([]);
+  const [todaySymptoms, setTodaySymptoms] = useState<string[]>([]);
+
   const { data: phase, isLoading: loadingPhase, refetch: refetchPhase } = useGetCurrentCyclePhase();
   const { data: entries, isLoading: loadingEntries, refetch: refetchEntries } = useListCycleEntries({});
   const createEntry = useCreateCycleEntry();
 
   const phaseKey = phase?.phase ?? "unknown";
-  const phaseColor = PHASE_COLORS[phaseKey] ?? PHASE_COLORS.unknown;
+  const phaseColor = PHASE_COLORS[phaseKey] ?? PHASE_COLORS.unknown!;
 
-  // Phase descriptions use translations
   const phaseDescKey = `phaseDesc${phaseKey.charAt(0).toUpperCase() + phaseKey.slice(1)}` as "phaseDescMenstrual";
   const energyKey = `energy${phaseKey.charAt(0).toUpperCase() + phaseKey.slice(1)}` as "energyMenstrual";
   const recKeys = [0,1,2,3].map((i) => `rec${phaseKey.charAt(0).toUpperCase() + phaseKey.slice(1)}${i}` as "recMenstrual0");
@@ -79,6 +87,17 @@ export default function CycleScreen() {
   ] as const;
   const SYMPTOMS = SYMPTOMS_KEYS.map((k) => ({ key: k, label: t(k) }));
 
+  useEffect(() => {
+    loadTodaySymptoms();
+  }, []);
+
+  async function loadTodaySymptoms() {
+    try {
+      const stored = await AsyncStorage.getItem(todayKey());
+      if (stored) setTodaySymptoms(JSON.parse(stored) as string[]);
+    } catch {}
+  }
+
   async function handleLog() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
@@ -97,9 +116,28 @@ export default function CycleScreen() {
     } catch {}
   }
 
-  function toggleSymptom(label: string) {
+  function toggleLogSymptom(label: string) {
     Haptics.selectionAsync();
     setLogSymptoms((prev) => prev.includes(label) ? prev.filter((x) => x !== label) : [...prev, label]);
+  }
+
+  function togglePickerSymptom(label: string) {
+    Haptics.selectionAsync();
+    setPickerSymptoms((prev) => prev.includes(label) ? prev.filter((x) => x !== label) : [...prev, label]);
+  }
+
+  async function saveSymptoms() {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try {
+      await AsyncStorage.setItem(todayKey(), JSON.stringify(pickerSymptoms));
+      setTodaySymptoms(pickerSymptoms);
+      setShowSymptomPicker(false);
+    } catch {}
+  }
+
+  function openSymptomPicker() {
+    setPickerSymptoms([...todaySymptoms]);
+    setShowSymptomPicker(true);
   }
 
   return (
@@ -115,6 +153,38 @@ export default function CycleScreen() {
           </Pressable>
         </View>
 
+        {/* ── Today's Symptoms card ── */}
+        <View style={[s.sympCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={s.sympCardHeader}>
+            <Text style={[s.sympCardTitle, { color: colors.foreground }]}>{t("todaysSymptoms")}</Text>
+            <Pressable
+              onPress={openSymptomPicker}
+              style={[s.addSympBtn, { backgroundColor: colors.primary }]}
+            >
+              <Text style={[s.addSympBtnText, { color: colors.primaryForeground }]}>+ {t("addSymptoms")}</Text>
+            </Pressable>
+          </View>
+
+          {todaySymptoms.length === 0 ? (
+            <Text style={[s.noSymptomsText, { color: colors.mutedForeground }]}>{t("noSymptomsYet")}</Text>
+          ) : (
+            <>
+              <View style={s.sympPills}>
+                {todaySymptoms.map((sym) => (
+                  <View key={sym} style={[s.sympPill, { backgroundColor: phaseColor + "22", borderColor: phaseColor + "66" }]}>
+                    <Text style={[s.sympPillText, { color: phaseColor }]}>{sym}</Text>
+                  </View>
+                ))}
+              </View>
+              <View style={[s.lunaNotice, { backgroundColor: colors.primary + "14", borderColor: colors.primary + "33" }]}>
+                <Text style={s.lunaNoticeGlyph}>☽</Text>
+                <Text style={[s.lunaNoticeText, { color: colors.foreground }]}>{t("lunaNoteSymptoms")}</Text>
+              </View>
+            </>
+          )}
+        </View>
+
+        {/* ── Phase card ── */}
         {loadingPhase ? (
           <View style={s.loading}><ActivityIndicator color={colors.primary} /></View>
         ) : (
@@ -157,6 +227,7 @@ export default function CycleScreen() {
           </View>
         )}
 
+        {/* ── Recent entries ── */}
         {entries && entries.length > 0 && (
           <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[s.cardTitle, { color: colors.foreground }]}>{t("recentEntries")}</Text>
@@ -183,6 +254,58 @@ export default function CycleScreen() {
         {loadingEntries && <View style={s.loading}><ActivityIndicator color={colors.primary} /></View>}
       </ScrollView>
 
+      {/* ── Symptom Picker Modal ── */}
+      <Modal visible={showSymptomPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowSymptomPicker(false)}>
+        <View style={[sp.root, { backgroundColor: colors.background, paddingTop: topPad + 16 }]}>
+          <View style={[sp.header, { borderBottomColor: colors.border }]}>
+            <View>
+              <Text style={[sp.title, { color: colors.foreground }]}>{t("todaysSymptoms")}</Text>
+              <Text style={[sp.sub, { color: colors.mutedForeground }]}>{t("howAreYouFeeling")}</Text>
+            </View>
+            <Pressable onPress={() => setShowSymptomPicker(false)} hitSlop={12}>
+              <Text style={[sp.cancel, { color: colors.mutedForeground }]}>{t("cancel")}</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView contentContainerStyle={sp.content}>
+            <View style={sp.grid}>
+              {SYMPTOMS.map((sym) => {
+                const selected = pickerSymptoms.includes(sym.label);
+                return (
+                  <Pressable
+                    key={sym.key}
+                    onPress={() => togglePickerSymptom(sym.label)}
+                    style={[sp.pill, {
+                      backgroundColor: selected ? phaseColor + "22" : colors.card,
+                      borderColor: selected ? phaseColor : colors.border,
+                    }]}
+                  >
+                    <Text style={[sp.pillText, { color: selected ? phaseColor : colors.foreground }]}>{sym.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {pickerSymptoms.length > 0 && (
+              <View style={[sp.lunaPreview, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "33" }]}>
+                <Text style={sp.lunaPreviewGlyph}>☽</Text>
+                <Text style={[sp.lunaPreviewText, { color: colors.foreground }]}>{t("lunaNoteSymptoms")}</Text>
+              </View>
+            )}
+          </ScrollView>
+
+          <View style={[sp.footer, { paddingBottom: isWeb ? 34 : insets.bottom + 16, borderTopColor: colors.border }]}>
+            <Pressable
+              onPress={saveSymptoms}
+              style={[sp.saveBtn, { backgroundColor: colors.primary }]}
+            >
+              <Text style={[sp.saveBtnText, { color: colors.primaryForeground }]}>{t("checkinSave")}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Log Entry Modal ── */}
       <Modal visible={showLog} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowLog(false)}>
         <LogSheet
           logType={logType}
@@ -190,7 +313,7 @@ export default function CycleScreen() {
           entryTypes={ENTRY_TYPES}
           symptomItems={SYMPTOMS}
           onType={setLogType}
-          onToggleSymptom={toggleSymptom}
+          onToggleSymptom={toggleLogSymptom}
           onSave={handleLog}
           onClose={() => setShowLog(false)}
           saving={createEntry.isPending}
@@ -278,10 +401,24 @@ function LogSheet({
 
 const s = StyleSheet.create({
   heading: { fontSize: 28, fontFamily: "PlusJakartaSans_700Bold" },
-  titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
   logBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100 },
   logBtnText: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold" },
   loading: { paddingVertical: 40, alignItems: "center" },
+  // Today's Symptoms card
+  sympCard: { borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 14 },
+  sympCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  sympCardTitle: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold" },
+  addSympBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 100 },
+  addSympBtnText: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold" },
+  noSymptomsText: { fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", textAlign: "center", paddingVertical: 8 },
+  sympPills: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
+  sympPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100, borderWidth: 1 },
+  sympPillText: { fontSize: 13, fontFamily: "PlusJakartaSans_500Medium" },
+  lunaNotice: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
+  lunaNoticeGlyph: { fontSize: 16 },
+  lunaNoticeText: { flex: 1, fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", lineHeight: 18 },
+  // Phase card
   phaseCard: { borderRadius: 20, borderWidth: 1, padding: 20, marginBottom: 16 },
   phaseCardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 },
   phaseEmoji: { fontSize: 32, marginBottom: 6 },
@@ -305,6 +442,24 @@ const s = StyleSheet.create({
   entryType: { fontSize: 14, fontFamily: "PlusJakartaSans_500Medium" },
   entrySymptoms: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", marginTop: 2 },
   entryDate: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", flexShrink: 0 },
+});
+
+const sp = StyleSheet.create({
+  root: { flex: 1 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: 1, marginBottom: 4 },
+  title: { fontSize: 22, fontFamily: "PlusJakartaSans_700Bold" },
+  sub: { fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", marginTop: 3 },
+  cancel: { fontSize: 15, fontFamily: "PlusJakartaSans_400Regular", paddingTop: 4 },
+  content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 20 },
+  pill: { paddingHorizontal: 16, paddingVertical: 11, borderRadius: 100, borderWidth: 1.5 },
+  pillText: { fontSize: 14, fontFamily: "PlusJakartaSans_500Medium" },
+  lunaPreview: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12 },
+  lunaPreviewGlyph: { fontSize: 18 },
+  lunaPreviewText: { flex: 1, fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", lineHeight: 19 },
+  footer: { paddingHorizontal: 20, paddingTop: 14, borderTopWidth: 1 },
+  saveBtn: { paddingVertical: 16, borderRadius: 16, alignItems: "center" },
+  saveBtnText: { fontSize: 16, fontFamily: "PlusJakartaSans_700Bold" },
 });
 
 const ls = StyleSheet.create({

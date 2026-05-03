@@ -14,6 +14,10 @@ function NativeTabLayout() {
   const { t } = useLanguage();
   return (
     <NativeTabs>
+      <NativeTabs.Trigger name="profile">
+        <Icon sf={{ default: "person", selected: "person.fill" }} />
+        <Label>{t("tabMe")}</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: "sun.max", selected: "sun.max.fill" }} />
         <Label>{t("tabToday")}</Label>
@@ -29,10 +33,6 @@ function NativeTabLayout() {
       <NativeTabs.Trigger name="cycle">
         <Icon sf={{ default: "moon.stars", selected: "moon.stars.fill" }} />
         <Label>{t("tabCycle")}</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="profile">
-        <Icon sf={{ default: "person", selected: "person.fill" }} />
-        <Label>{t("tabMe")}</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -75,7 +75,16 @@ function ClassicTabLayout() {
           fontSize: 11,
         },
       }}
+      initialRouteName="index"
     >
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: t("tabMe"),
+          tabBarIcon: ({ color }) =>
+            isIOS ? <SymbolView name="person" tintColor={color} size={24} /> : <Feather name="user" size={22} color={color} />,
+        }}
+      />
       <Tabs.Screen
         name="index"
         options={{
@@ -106,14 +115,6 @@ function ClassicTabLayout() {
           title: t("tabCycle"),
           tabBarIcon: ({ color }) =>
             isIOS ? <SymbolView name="moon.stars" tintColor={color} size={24} /> : <Feather name="moon" size={22} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: t("tabMe"),
-          tabBarIcon: ({ color }) =>
-            isIOS ? <SymbolView name="person" tintColor={color} size={24} /> : <Feather name="user" size={22} color={color} />,
         }}
       />
     </Tabs>

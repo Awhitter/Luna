@@ -94,6 +94,7 @@ export default function TodayScreen() {
   const bottomPad = isWeb ? 90 : insets.bottom;
 
   const [showLuna, setShowLuna] = useState(false);
+  const [todaySymptoms, setTodaySymptoms] = useState<string[]>([]);
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
@@ -141,7 +142,16 @@ export default function TodayScreen() {
     if (initialized.current) return;
     initialized.current = true;
     initConversation();
+    loadTodaySymptoms();
   }, []);
+
+  async function loadTodaySymptoms() {
+    try {
+      const key = `today-symptoms-${new Date().toISOString().split("T")[0]}`;
+      const stored = await AsyncStorage.getItem(key);
+      if (stored) setTodaySymptoms(JSON.parse(stored) as string[]);
+    } catch {}
+  }
 
   async function initConversation() {
     if (convInitLock) return;
@@ -207,7 +217,7 @@ export default function TodayScreen() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-          body: JSON.stringify({ content: text, language }),
+          body: JSON.stringify({ content: text, language, symptoms: todaySymptoms.length > 0 ? todaySymptoms : undefined }),
         }
       );
       if (!response.ok) throw new Error("Request failed");

@@ -85,7 +85,8 @@ function buildSystemContext(
   lastPeriod: typeof cycleEntries.$inferSelect | undefined,
   today: typeof dailyContexts.$inferSelect | undefined,
   pendingTasks: typeof tasks.$inferSelect[],
-  language = "en"
+  language = "en",
+  symptoms?: string[]
 ): string {
   let ctx = `You are Luna, a warm and deeply personal AI life assistant — like a best friend who genuinely cares, remembers everything, and always knows what you need before you ask.
 
@@ -133,6 +134,10 @@ Current context about her life:`;
     ctx += `\n- Already on her list: ${tasksWithTimes.join(", ")}`;
   }
 
+  if (symptoms && symptoms.length > 0) {
+    ctx += `\n- TODAY'S SYMPTOMS she logged: ${symptoms.join(", ")} — factor these into every suggestion. Acknowledge them naturally, suggest tasks and meals that are gentle on her body, avoid suggesting high-intensity activity.`;
+  }
+
   ctx += `\n\nTASK ADDING RULES — follow these exactly:
 
 1. When she mentions adding a task and hasn't specified a time, always ask: "What time do you plan to do that?" before adding it. Wait for her answer.
@@ -165,6 +170,7 @@ router.post("/openai/conversations/:id/messages", async (req, res) => {
     if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
 
     const language = (req.body.language as string) || "en";
+    const symptoms = (req.body.symptoms as string[] | undefined) ?? [];
     const convId = idParsed.data.id;
     const conv = await db.select().from(conversations).where(eq(conversations.id, convId));
     if (conv.length === 0) return res.status(404).json({ error: "Conversation not found" });
@@ -182,7 +188,7 @@ router.post("/openai/conversations/:id/messages", async (req, res) => {
     const todayData = todayCtx[0];
     const lastPeriod = cyclePhase.find(e => e.entryType === "period_start");
     const pendingTasks = recentTasks.filter(t => !t.completed).slice(0, 5);
-    const systemContext = buildSystemContext(profile, lastPeriod, todayData, pendingTasks, language);
+    const systemContext = buildSystemContext(profile, lastPeriod, todayData, pendingTasks, language, symptoms.length > 0 ? symptoms : undefined);
 
     const history = await db.select().from(messages)
       .where(eq(messages.conversationId, convId))
