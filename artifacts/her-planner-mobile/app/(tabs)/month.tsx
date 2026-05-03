@@ -201,18 +201,24 @@ export default function MonthScreen() {
                   isSelected && { borderWidth: 2, borderColor: colors.foreground },
                 ]}
               >
-                <Text style={[
-                  s.cellNum,
-                  { color: isToday ? colors.primary : colors.foreground },
-                  isToday && s.cellNumToday,
-                ]}>
-                  {date.getDate()}
-                </Text>
+                {/* Top row: date + check-in dot */}
+                <View style={s.cellTopRow}>
+                  <Text style={[
+                    s.cellNum,
+                    { color: isToday ? colors.primary : colors.foreground },
+                    isToday && s.cellNumToday,
+                  ]}>
+                    {date.getDate()}
+                  </Text>
+                  {hasCtx ? (
+                    <View style={[s.ctxDot, { backgroundColor: colors.primary }]} />
+                  ) : (
+                    <View style={s.ctxDotEmpty} />
+                  )}
+                </View>
+                {/* Phase bar */}
                 {phaseColor && (
                   <View style={[s.phaseBar, { backgroundColor: phaseColor }]} />
-                )}
-                {hasCtx && (
-                  <View style={[s.ctxDot, { backgroundColor: colors.primary }]} />
                 )}
               </Pressable>
             );
@@ -376,12 +382,19 @@ const s = StyleSheet.create({
     padding: 4,
     alignItems: "center",
     justifyContent: "flex-start",
-    overflow: "hidden",
   },
-  cellNum: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold", marginTop: 2 },
+  cellTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    paddingHorizontal: 2,
+  },
+  cellNum: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold" },
   cellNumToday: { fontFamily: "PlusJakartaSans_700Bold" },
-  phaseBar: { height: 3, width: "70%", borderRadius: 2, marginTop: 3 },
-  ctxDot: { width: 5, height: 5, borderRadius: 3, marginTop: 2 },
+  phaseBar: { height: 3, width: "70%", borderRadius: 2, marginTop: 4 },
+  ctxDot: { width: 7, height: 7, borderRadius: 4 },
+  ctxDotEmpty: { width: 7, height: 7 },
   hint: { textAlign: "center", fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", marginTop: 12 },
 });
 
