@@ -296,6 +296,21 @@ export const GetTodayContextResponse = zod.object({
 });
 
 /**
+ * @summary Get current and longest check-in streak
+ */
+export const GetCheckinStreakResponse = zod.object({
+  currentStreak: zod
+    .number()
+    .describe("Consecutive days ending today or yesterday"),
+  longestStreak: zod.number().describe("All-time longest streak"),
+  lastCheckinDate: zod.coerce
+    .date()
+    .nullish()
+    .describe("ISO date of most recent check-in"),
+  totalCheckins: zod.number().describe("Total number of check-ins ever"),
+});
+
+/**
  * @summary List all conversations
  */
 export const ListOpenaiConversationsResponseItem = zod.object({

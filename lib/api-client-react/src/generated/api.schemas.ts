@@ -221,6 +221,17 @@ export interface CyclePhase {
   recommendation: string;
 }
 
+export interface CheckinStreak {
+  /** Consecutive days ending today or yesterday */
+  currentStreak: number;
+  /** All-time longest streak */
+  longestStreak: number;
+  /** ISO date of most recent check-in */
+  lastCheckinDate?: string | null;
+  /** Total number of check-ins ever */
+  totalCheckins: number;
+}
+
 export interface DailyContext {
   id: number;
   date: string;

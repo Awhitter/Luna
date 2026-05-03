@@ -18,6 +18,7 @@ import type {
 
 import type {
   ApiError,
+  CheckinStreak,
   CreateCycleEntryBody,
   CreateDailyContextBody,
   CreateOpenaiConversationBody,
@@ -1382,6 +1383,81 @@ export function useGetTodayContext<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetTodayContextQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get current and longest check-in streak
+ */
+export const getGetCheckinStreakUrl = () => {
+  return `/api/daily-context/streak`;
+};
+
+export const getCheckinStreak = async (
+  options?: RequestInit,
+): Promise<CheckinStreak> => {
+  return customFetch<CheckinStreak>(getGetCheckinStreakUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCheckinStreakQueryKey = () => {
+  return [`/api/daily-context/streak`] as const;
+};
+
+export const getGetCheckinStreakQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCheckinStreak>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCheckinStreak>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetCheckinStreakQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCheckinStreak>>
+  > = ({ signal }) => getCheckinStreak({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCheckinStreak>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCheckinStreakQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCheckinStreak>>
+>;
+export type GetCheckinStreakQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get current and longest check-in streak
+ */
+
+export function useGetCheckinStreak<
+  TData = Awaited<ReturnType<typeof getCheckinStreak>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getCheckinStreak>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCheckinStreakQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

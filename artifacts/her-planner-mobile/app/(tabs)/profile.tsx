@@ -1,5 +1,6 @@
 import {
   useCreateProfile,
+  useGetCheckinStreak,
   useGetProfile,
   useUpdateProfile,
 } from "@workspace/api-client-react";
@@ -36,6 +37,7 @@ export default function ProfileScreen() {
   const { t, language, setLanguage } = useLanguage();
 
   const { data: profile, isLoading } = useGetProfile();
+  const { data: streak } = useGetCheckinStreak();
   const updateProfile = useUpdateProfile();
   const createProfile = useCreateProfile();
 
@@ -100,6 +102,43 @@ export default function ProfileScreen() {
       bottomOffset={20}
     >
       <Text style={[s.heading, { color: colors.foreground }]}>{t("myProfile")}</Text>
+
+      {/* Streak Badge */}
+      {streak != null && (
+        <View style={[s.streakCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[s.streakCardTitle, { color: colors.mutedForeground }]}>{t("streakTitle")}</Text>
+          <View style={s.streakRow}>
+            {/* Current streak — hero tile */}
+            <View style={[s.streakHero, { backgroundColor: colors.primary + "18" }]}>
+              <Text style={s.streakFire}>🔥</Text>
+              <Text style={[s.streakHeroNum, { color: colors.primary }]}>{streak.currentStreak}</Text>
+              <Text style={[s.streakHeroLabel, { color: colors.mutedForeground }]}>
+                {streak.currentStreak === 1 ? t("streakDay", { n: "" }).replace("{n} ", "") : t("streakDays", { n: "" }).replace("{n} ", "")}
+              </Text>
+              <Text style={[s.streakHeroSub, { color: colors.primary }]}>
+                {streak.currentStreak > 0 ? t("streakFire") : t("streakStart")}
+              </Text>
+            </View>
+            {/* Stats column */}
+            <View style={s.streakStats}>
+              <View style={[s.streakStatRow, { borderColor: colors.border }]}>
+                <Text style={s.streakStatEmoji}>🏆</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.streakStatNum, { color: colors.foreground }]}>{streak.longestStreak}</Text>
+                  <Text style={[s.streakStatLabel, { color: colors.mutedForeground }]}>{t("longestStreak")}</Text>
+                </View>
+              </View>
+              <View style={s.streakStatRow}>
+                <Text style={s.streakStatEmoji}>✅</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.streakStatNum, { color: colors.foreground }]}>{streak.totalCheckins}</Text>
+                  <Text style={[s.streakStatLabel, { color: colors.mutedForeground }]}>{t("totalCheckins")}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
 
       {isLoading ? (
         <View style={s.loading}><ActivityIndicator color={colors.primary} /></View>
@@ -269,4 +308,17 @@ const s = StyleSheet.create({
   kidNumText: { fontSize: 16, fontFamily: "PlusJakartaSans_600SemiBold" },
   saveBtn: { paddingVertical: 16, borderRadius: 14, alignItems: "center", marginTop: 8 },
   saveBtnText: { fontSize: 16, fontFamily: "PlusJakartaSans_600SemiBold" },
+  streakCard: { borderWidth: 1, borderRadius: 18, padding: 16, marginBottom: 28 },
+  streakCardTitle: { fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold", letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 14 },
+  streakRow: { flexDirection: "row", gap: 12 },
+  streakHero: { flex: 1, borderRadius: 16, padding: 14, alignItems: "center", justifyContent: "center" },
+  streakFire: { fontSize: 28, marginBottom: 4 },
+  streakHeroNum: { fontSize: 42, fontFamily: "PlusJakartaSans_700Bold", lineHeight: 46 },
+  streakHeroLabel: { fontSize: 11, fontFamily: "PlusJakartaSans_500Medium", marginTop: 2 },
+  streakHeroSub: { fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold", marginTop: 6, textAlign: "center" },
+  streakStats: { flex: 1, justifyContent: "space-between", gap: 10 },
+  streakStatRow: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 10, backgroundColor: "transparent" },
+  streakStatEmoji: { fontSize: 22 },
+  streakStatNum: { fontSize: 20, fontFamily: "PlusJakartaSans_700Bold" },
+  streakStatLabel: { fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", marginTop: 1 },
 });

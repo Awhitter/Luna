@@ -7,6 +7,7 @@
  */
 
 export * from "./apiError";
+export * from "./checkinStreak";
 export * from "./createCycleEntryBody";
 export * from "./createCycleEntryBodyEntryType";
 export * from "./createDailyContextBody";
