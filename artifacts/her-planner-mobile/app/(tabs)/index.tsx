@@ -64,6 +64,9 @@ const DAYS   = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Sat
 const PHASE_EMOJI: Record<string, string> = {
   menstrual: "🌑", follicular: "🌒", ovulation: "🌕", luteal: "🌖", unknown: "🌙",
 };
+const PHASE_COLORS: Record<string, string> = {
+  menstrual: "#e07070", follicular: "#70b070", ovulation: "#d4a843", luteal: "#9b7fc4", unknown: "#b0b0b0",
+};
 
 function formatTime(ts: number) {
   return new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
@@ -90,6 +93,7 @@ export default function TodayScreen() {
   const topPad = isWeb ? 67 : insets.top;
   const bottomPad = isWeb ? 90 : insets.bottom;
 
+  const [showLuna, setShowLuna] = useState(false);
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
@@ -121,12 +125,17 @@ export default function TodayScreen() {
   const checkinNeeded = !todayCtx;
   const firstName = profile?.name?.split(" ")[0] ?? "";
   const phaseKey = phase?.phase ?? "unknown";
+  const phaseColor = PHASE_COLORS[phaseKey] ?? PHASE_COLORS.unknown!;
 
-  // Mood / energy display labels (English internal values sent to API)
-  const MOOD_EN   = ["", "Awful",  "Bad",  "Okay",   "Good",  "Great"];
+  const MOOD_EN   = ["", "Awful", "Bad", "Okay", "Good", "Great"];
   const MOOD_DISP = ["", t("moodAwful"), t("moodBad"), t("moodOkay"), t("moodGood"), t("moodGreat")];
   const ENERGY_DISP = ["", t("energyNone"), t("energyLow"), t("energyMedium"), t("energyHigh"), t("energyFull")];
   const SLEEP_OPTIONS = [5, 6, 7, 8, 9];
+
+  const todayTasks = React.useMemo(() => {
+    if (!tasks) return [];
+    return tasks.filter((tk) => tk.view === "today");
+  }, [tasks]);
 
   useEffect(() => {
     if (initialized.current) return;
@@ -292,88 +301,37 @@ export default function TodayScreen() {
   }
 
   const reversed = [...messages].reverse();
-
   const PROMPTS = [t("prompt1"), t("prompt2"), t("prompt3"), t("prompt4")];
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
 
-      {/* ─── Header ─── */}
-      <View style={[s.header, { paddingTop: topPad + 10, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <View style={s.welcomeRow}>
-          <View style={{ flex: 1 }}>
-            {firstName ? (
-              <>
-                <Text style={[s.welcomeLine, { color: colors.mutedForeground }]}>
-                  {DAYS[now.getDay()]}, {MONTHS[now.getMonth()]} {now.getDate()}
-                </Text>
-                <Text style={[s.welcomeName, { color: colors.foreground }]}>
-                  {t("welcomeBack")} {firstName} 👋
-                </Text>
-              </>
-            ) : (
-              <Text style={[s.welcomeName, { color: colors.foreground }]}>Her Planner</Text>
-            )}
-          </View>
-          <Pressable onPress={() => setShowTasks(true)} style={[s.tasksBtn, { backgroundColor: colors.primary }]}>
-            <Text style={[s.tasksBtnText, { color: colors.primaryForeground }]}>{t("tasks")}</Text>
-          </Pressable>
+      {/* ─── Dashboard ─── */}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingTop: topPad + 16, paddingBottom: 20 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={s.headerSection}>
+          <Text style={[s.dateText, { color: colors.mutedForeground }]}>
+            {DAYS[now.getDay()]}, {MONTHS[now.getMonth()]} {now.getDate()}
+          </Text>
+          <Text style={[s.greetingText, { color: colors.foreground }]}>
+            {firstName ? `${t("welcomeBack")} ${firstName} 👋` : "Her Planner"}
+          </Text>
         </View>
 
-        <View style={[s.statsRow, { borderTopColor: colors.border }]}>
-          <View style={s.miniRingGroup}>
-            <RingChart completed={summary?.today?.completed ?? 0} total={summary?.today?.total ?? 0} size={56} strokeWidth={5} color={colors.primary} bgColor={colors.muted} label={t("today")} labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
-            <RingChart completed={summary?.week?.completed ?? 0} total={summary?.week?.total ?? 0} size={56} strokeWidth={5} color="#9b7fc4" bgColor={colors.muted} label={t("week")} labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
-            <RingChart completed={summary?.month?.completed ?? 0} total={summary?.month?.total ?? 0} size={56} strokeWidth={5} color="#d4a843" bgColor={colors.muted} label={t("month")} labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
-          </View>
-          <View style={[s.divV, { backgroundColor: colors.border }]} />
-          <View style={s.contextStack}>
-            <View style={[s.phasePill, { backgroundColor: colors.accent }]}>
-              <Text style={s.pillEmoji}>{PHASE_EMOJI[phaseKey]}</Text>
-              <Text style={[s.pillText, { color: colors.foreground }]}>
-                {t(`phase${phaseKey.charAt(0).toUpperCase() + phaseKey.slice(1)}` as "phaseMenstrual")}
-                {phase?.dayInCycle != null ? ` · ${t("dayShort", { n: phase.dayInCycle })}` : ""}
-              </Text>
-              {phase?.nextPeriodIn != null && (
-                <Text style={[s.pillText, { color: colors.mutedForeground, fontSize: 10 }]}>
-                  {" · "}{t("periodIn", { n: phase.nextPeriodIn })}
-                </Text>
-              )}
-            </View>
-            {todayCtx && (
-              <View style={s.scoresRow}>
-                {todayCtx.mood && (
-                  <View style={[s.scoreCard, { backgroundColor: colors.accent }]}>
-                    <Text style={s.scoreEmoji}>😊</Text>
-                    <Text style={[s.scoreVal, { color: colors.foreground }]}>{todayCtx.mood}</Text>
-                  </View>
-                )}
-                {todayCtx.energyLevel != null && (
-                  <View style={[s.scoreCard, { backgroundColor: "#9b7fc422" }]}>
-                    <Text style={s.scoreEmoji}>⚡</Text>
-                    <Text style={[s.scoreVal, { color: colors.foreground }]}>{todayCtx.energyLevel}/5</Text>
-                  </View>
-                )}
-                {todayCtx.sleepHours != null && (
-                  <View style={[s.scoreCard, { backgroundColor: "#d4a84322" }]}>
-                    <Text style={s.scoreEmoji}>😴</Text>
-                    <Text style={[s.scoreVal, { color: colors.foreground }]}>{todayCtx.sleepHours}h</Text>
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Inline check-in */}
+        {/* ── Check-in card ── */}
         {checkinNeeded && (
-          <View style={[s.checkinBanner, { borderTopColor: colors.border }]}>
+          <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {!checkinExpanded ? (
               <Pressable
-                style={s.checkinBannerInner}
+                style={s.checkinRow}
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCheckinExpanded(true); }}
               >
-                <Text style={[s.checkinBannerText, { color: colors.mutedForeground }]}>☀️  {t("checkinBanner")}</Text>
+                <Text style={s.checkinSun}>☀️</Text>
+                <Text style={[s.checkinBannerText, { color: colors.mutedForeground }]}>{t("checkinBanner")}</Text>
                 <View style={[s.checkinBannerBtn, { backgroundColor: colors.primary }]}>
                   <Text style={[s.checkinBannerBtnTxt, { color: colors.primaryForeground }]}>{t("checkinStart")}</Text>
                 </View>
@@ -403,54 +361,190 @@ export default function TodayScreen() {
             )}
           </View>
         )}
-      </View>
 
-      {/* ─── Chat ─── */}
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={0}>
-        <FlatList
-          data={reversed}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <MessageBubble message={item} colors={colors} addedTasks={addedTasks} onAddTask={handleAddSuggestedTask} tSuggested={t("suggestedTasks")} />
-          )}
-          inverted={messages.length > 0}
-          ListHeaderComponent={showTyping ? <TypingBubble colors={colors} text={t("lunaThinking")} /> : null}
-          ListEmptyComponent={<EmptyState colors={colors} name={firstName} onPrompt={handlePromptTap} prompts={PROMPTS} hiPrefix={t("hiPrefix")} iAmLuna={t("iAmLuna")} desc={t("lunaDesc")} />}
-          keyboardDismissMode="interactive"
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={messages.length === 0 ? s.emptyContainer : s.msgList}
-          showsVerticalScrollIndicator={false}
-        />
+        {/* ── Today's wellness (if checked in) ── */}
+        {todayCtx && (
+          <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[s.phasePill, { backgroundColor: phaseColor + "22" }]}>
+              <Text style={s.pillEmoji}>{PHASE_EMOJI[phaseKey]}</Text>
+              <Text style={[s.pillText, { color: phaseColor }]}>
+                {t(`phase${phaseKey.charAt(0).toUpperCase() + phaseKey.slice(1)}` as "phaseMenstrual")}
+                {phase?.dayInCycle != null ? ` · Day ${phase.dayInCycle}` : ""}
+              </Text>
+              {phase?.nextPeriodIn != null && (
+                <Text style={[s.pillText, { color: colors.mutedForeground, fontSize: 10 }]}>
+                  {" · "}{t("periodIn", { n: phase.nextPeriodIn })}
+                </Text>
+              )}
+            </View>
+            <View style={s.scoreTilesRow}>
+              {todayCtx.mood != null && (
+                <View style={[s.scoreTile, { backgroundColor: colors.primary + "18" }]}>
+                  <Text style={s.scoreTileEmoji}>😊</Text>
+                  <Text style={[s.scoreTileVal, { color: colors.primary }]}>{todayCtx.mood}</Text>
+                  <Text style={[s.scoreTileLabel, { color: colors.mutedForeground }]}>{t("checkinMood")}</Text>
+                </View>
+              )}
+              {todayCtx.energyLevel != null && (
+                <View style={[s.scoreTile, { backgroundColor: "#9b7fc418" }]}>
+                  <Text style={s.scoreTileEmoji}>⚡</Text>
+                  <Text style={[s.scoreTileVal, { color: "#7b5fa4" }]}>{todayCtx.energyLevel}/5</Text>
+                  <Text style={[s.scoreTileLabel, { color: colors.mutedForeground }]}>{t("checkinEnergy")}</Text>
+                </View>
+              )}
+              {todayCtx.sleepHours != null && (
+                <View style={[s.scoreTile, { backgroundColor: "#d4a84318" }]}>
+                  <Text style={s.scoreTileEmoji}>😴</Text>
+                  <Text style={[s.scoreTileVal, { color: "#b8891a" }]}>{todayCtx.sleepHours}h</Text>
+                  <Text style={[s.scoreTileLabel, { color: colors.mutedForeground }]}>{t("checkinSleep")}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
 
-        <View style={[s.inputArea, { paddingBottom: bottomPad + 6, borderTopColor: colors.border, backgroundColor: colors.background }]}>
-          <Text style={[s.inputLabel, { color: colors.mutedForeground }]}>{t("planYourDay")}</Text>
-          <View style={s.inputRow}>
-            <TextInput
-              ref={inputRef}
-              style={[s.inputField, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
-              placeholder={t("inputPlaceholder")}
-              placeholderTextColor={colors.mutedForeground}
-              value={inputText}
-              onChangeText={setInputText}
-              onSubmitEditing={handleSend}
-              blurOnSubmit={false}
-              multiline
-              maxLength={1200}
-              returnKeyType="send"
-            />
-            <Pressable
-              onPress={() => { void handleSend(); inputRef.current?.focus(); }}
-              style={[s.sendBtn, { backgroundColor: inputText.trim() && !isStreaming ? colors.primary : colors.muted }]}
-              disabled={!inputText.trim() || isStreaming}
-            >
-              {isStreaming
-                ? <ActivityIndicator size="small" color={colors.mutedForeground} />
-                : <Text style={[s.sendIcon, { color: inputText.trim() ? colors.primaryForeground : colors.mutedForeground }]}>↑</Text>
-              }
-            </Pressable>
+        {/* ── Task progress rings ── */}
+        <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[s.cardTitle, { color: colors.foreground }]}>{t("taskProgress")}</Text>
+          <View style={s.ringsRow}>
+            <RingChart completed={summary?.today?.completed ?? 0} total={summary?.today?.total ?? 0} size={92} strokeWidth={8} color={colors.primary} bgColor={colors.muted} label={t("today")} labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
+            <View style={[s.ringDiv, { backgroundColor: colors.border }]} />
+            <RingChart completed={summary?.week?.completed ?? 0} total={summary?.week?.total ?? 0} size={92} strokeWidth={8} color="#9b7fc4" bgColor={colors.muted} label={t("week")} labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
+            <View style={[s.ringDiv, { backgroundColor: colors.border }]} />
+            <RingChart completed={summary?.month?.completed ?? 0} total={summary?.month?.total ?? 0} size={92} strokeWidth={8} color="#d4a843" bgColor={colors.muted} label={t("month")} labelColor={colors.foreground} mutedColor={colors.mutedForeground} />
           </View>
         </View>
-      </KeyboardAvoidingView>
+
+        {/* ── Today's tasks ── */}
+        <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={s.cardHeaderRow}>
+            <Text style={[s.cardTitle, { color: colors.foreground }]}>{t("todaysTasks")}</Text>
+            <Pressable onPress={() => setShowTasks(true)}>
+              <Text style={[s.seeAll, { color: colors.primary }]}>{t("seeAll")}</Text>
+            </Pressable>
+          </View>
+          <View style={[s.quickAddRow, { backgroundColor: colors.muted }]}>
+            <TextInput
+              style={[s.quickAddInput, { color: colors.foreground }]}
+              placeholder={t("addTaskPh")}
+              placeholderTextColor={colors.mutedForeground}
+              value={newTaskText}
+              onChangeText={setNewTaskText}
+              onSubmitEditing={addTask}
+              returnKeyType="done"
+            />
+            <Pressable onPress={addTask} style={[s.quickAddBtn, { backgroundColor: colors.primary }]}>
+              <Text style={[s.quickAddBtnText, { color: colors.primaryForeground }]}>+</Text>
+            </Pressable>
+          </View>
+          {todayTasks.length === 0 ? (
+            <Text style={[s.emptyTasks, { color: colors.mutedForeground }]}>{t("noTasks")}</Text>
+          ) : (
+            todayTasks.slice(0, 6).map((task) => (
+              <TaskRow key={task.id} task={task} onToggle={toggleTask} onDelete={removeTask} colors={colors} />
+            ))
+          )}
+        </View>
+
+        {/* ── Cycle phase card ── */}
+        {phase && (
+          <View style={[s.phaseCard, { backgroundColor: colors.card, borderColor: colors.border, borderLeftColor: phaseColor }]}>
+            <View style={s.phaseCardRow}>
+              <Text style={s.phaseEmoji}>{PHASE_EMOJI[phaseKey]}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.phaseLabel, { color: phaseColor }]}>
+                  {t(`phase${phaseKey.charAt(0).toUpperCase() + phaseKey.slice(1)}` as "phaseMenstrual")}
+                </Text>
+                {phase.dayInCycle != null && (
+                  <Text style={[s.phaseSub, { color: colors.mutedForeground }]}>{t("dayOfCycle", { n: phase.dayInCycle })}</Text>
+                )}
+              </View>
+              {phase.nextPeriodIn != null && (
+                <View style={[s.nextPill, { backgroundColor: phaseColor + "22" }]}>
+                  <Text style={[s.nextPillLabel, { color: phaseColor }]}>{t("nextPeriod")}</Text>
+                  <Text style={[s.nextPillDays, { color: phaseColor }]}>{t("inDays", { n: phase.nextPeriodIn })}</Text>
+                </View>
+              )}
+            </View>
+            {phase.energyExpectation && (
+              <Text style={[s.phaseExpect, { color: colors.mutedForeground }]}>{phase.energyExpectation}</Text>
+            )}
+          </View>
+        )}
+      </ScrollView>
+
+      {/* ─── Plan with Luna button ─── */}
+      <View style={[s.lunaBar, { paddingBottom: bottomPad + 6, borderTopColor: colors.border, backgroundColor: colors.background }]}>
+        <Pressable
+          style={[s.lunaBtn, { backgroundColor: colors.primary }]}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowLuna(true); }}
+        >
+          <Text style={s.lunaBtnGlyph}>☽</Text>
+          <Text style={[s.lunaBtnText, { color: colors.primaryForeground }]}>{t("planWithLuna")}</Text>
+        </Pressable>
+      </View>
+
+      {/* ─── Luna Chat Modal ─── */}
+      <Modal visible={showLuna} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowLuna(false)}>
+        <View style={[lm.root, { backgroundColor: colors.background }]}>
+          <View style={[lm.header, { paddingTop: topPad + 10, borderBottomColor: colors.border, backgroundColor: colors.background }]}>
+            <View style={[lm.avatar, { backgroundColor: colors.primary }]}>
+              <Text style={lm.avatarGlyph}>☽</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[lm.name, { color: colors.foreground }]}>Luna</Text>
+              <Text style={[lm.sub, { color: colors.mutedForeground }]}>{t("lunaDesc")}</Text>
+            </View>
+            <Pressable onPress={() => setShowLuna(false)} hitSlop={12}>
+              <Text style={[lm.close, { color: colors.mutedForeground }]}>✕</Text>
+            </Pressable>
+          </View>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={0}>
+            <FlatList
+              data={reversed}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <MessageBubble message={item} colors={colors} addedTasks={addedTasks} onAddTask={handleAddSuggestedTask} tSuggested={t("suggestedTasks")} />
+              )}
+              inverted={messages.length > 0}
+              ListHeaderComponent={showTyping ? <TypingBubble colors={colors} text={t("lunaThinking")} /> : null}
+              ListEmptyComponent={<EmptyState colors={colors} name={firstName} onPrompt={handlePromptTap} prompts={PROMPTS} hiPrefix={t("hiPrefix")} iAmLuna={t("iAmLuna")} desc={t("lunaDesc")} />}
+              keyboardDismissMode="interactive"
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={messages.length === 0 ? s.emptyContainer : s.msgList}
+              showsVerticalScrollIndicator={false}
+            />
+            <View style={[s.inputArea, { paddingBottom: isWeb ? 34 : insets.bottom + 6, borderTopColor: colors.border, backgroundColor: colors.background }]}>
+              <Text style={[s.inputLabel, { color: colors.mutedForeground }]}>{t("planYourDay")}</Text>
+              <View style={s.inputRow}>
+                <TextInput
+                  ref={inputRef}
+                  style={[s.inputField, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+                  placeholder={t("inputPlaceholder")}
+                  placeholderTextColor={colors.mutedForeground}
+                  value={inputText}
+                  onChangeText={setInputText}
+                  onSubmitEditing={handleSend}
+                  blurOnSubmit={false}
+                  multiline
+                  maxLength={1200}
+                  returnKeyType="send"
+                />
+                <Pressable
+                  onPress={() => { void handleSend(); inputRef.current?.focus(); }}
+                  style={[s.sendBtn, { backgroundColor: inputText.trim() && !isStreaming ? colors.primary : colors.muted }]}
+                  disabled={!inputText.trim() || isStreaming}
+                >
+                  {isStreaming
+                    ? <ActivityIndicator size="small" color={colors.mutedForeground} />
+                    : <Text style={[s.sendIcon, { color: inputText.trim() ? colors.primaryForeground : colors.mutedForeground }]}>↑</Text>
+                  }
+                </Pressable>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
 
       {/* ─── Tasks Modal ─── */}
       <Modal visible={showTasks} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowTasks(false)}>
@@ -728,30 +822,60 @@ function TaskRow({ task, onToggle, onDelete, colors }: {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const s = StyleSheet.create({
   root: { flex: 1 },
-  header: { borderBottomWidth: 1 },
-  welcomeRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingBottom: 10 },
-  welcomeLine: { fontSize: 11, fontFamily: "PlusJakartaSans_400Regular" },
-  welcomeName: { fontSize: 20, fontFamily: "PlusJakartaSans_700Bold", marginTop: 1 },
-  tasksBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100 },
-  tasksBtnText: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold" },
-  statsRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, gap: 12 },
-  miniRingGroup: { flexDirection: "row", gap: 14, alignItems: "center" },
-  divV: { width: 1, height: 50, flexShrink: 0 },
-  contextStack: { flex: 1 },
-  phasePill: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 100, alignSelf: "flex-start" },
-  pillEmoji: { fontSize: 12 },
-  pillText: { fontSize: 12, fontFamily: "PlusJakartaSans_600SemiBold" },
-  scoresRow: { flexDirection: "row", gap: 5, marginTop: 5, flexWrap: "wrap" },
-  scoreCard: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 100 },
-  scoreEmoji: { fontSize: 12 },
-  scoreVal: { fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold" },
-  checkinBanner: { borderTopWidth: 1 },
-  checkinBannerInner: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 9, gap: 10 },
-  checkinBannerText: { flex: 1, fontSize: 13, fontFamily: "PlusJakartaSans_400Regular" },
-  checkinBannerBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 100 },
+  // Header
+  headerSection: { paddingHorizontal: 20, marginBottom: 18 },
+  dateText: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", marginBottom: 3 },
+  greetingText: { fontSize: 26, fontFamily: "PlusJakartaSans_700Bold" },
+  // Card
+  card: { marginHorizontal: 16, marginBottom: 14, borderRadius: 18, borderWidth: 1, padding: 16 },
+  cardTitle: { fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold", textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 16 },
+  cardHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
+  seeAll: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold" },
+  // Check-in
+  checkinRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  checkinSun: { fontSize: 22 },
+  checkinBannerText: { flex: 1, fontSize: 14, fontFamily: "PlusJakartaSans_400Regular" },
+  checkinBannerBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 100 },
   checkinBannerBtnTxt: { fontSize: 12, fontFamily: "PlusJakartaSans_600SemiBold" },
+  // Phase pill
+  phasePill: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100, alignSelf: "flex-start", marginBottom: 12 },
+  pillEmoji: { fontSize: 13 },
+  pillText: { fontSize: 12, fontFamily: "PlusJakartaSans_600SemiBold" },
+  // Score tiles
+  scoreTilesRow: { flexDirection: "row", gap: 8 },
+  scoreTile: { flex: 1, borderRadius: 14, padding: 12, alignItems: "center" },
+  scoreTileEmoji: { fontSize: 22, marginBottom: 4 },
+  scoreTileVal: { fontSize: 16, fontFamily: "PlusJakartaSans_700Bold" },
+  scoreTileLabel: { fontSize: 9, fontFamily: "PlusJakartaSans_500Medium", marginTop: 3, textTransform: "uppercase", letterSpacing: 0.4 },
+  // Rings
+  ringsRow: { flexDirection: "row", justifyContent: "space-evenly", alignItems: "center" },
+  ringDiv: { width: 1, height: 64 },
+  // Today tasks
+  quickAddRow: { flexDirection: "row", alignItems: "center", borderRadius: 12, overflow: "hidden", marginBottom: 10 },
+  quickAddInput: { flex: 1, fontSize: 14, fontFamily: "PlusJakartaSans_400Regular", paddingHorizontal: 14, paddingVertical: 12 },
+  quickAddBtn: { width: 46, height: 46, justifyContent: "center", alignItems: "center" },
+  quickAddBtnText: { fontSize: 20, fontFamily: "PlusJakartaSans_600SemiBold" },
+  emptyTasks: { fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", textAlign: "center", paddingVertical: 14 },
+  // Phase card
+  phaseCard: { marginHorizontal: 16, marginBottom: 14, borderRadius: 18, borderWidth: 1, borderLeftWidth: 4, padding: 16 },
+  phaseCardRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
+  phaseEmoji: { fontSize: 28 },
+  phaseLabel: { fontSize: 18, fontFamily: "PlusJakartaSans_700Bold" },
+  phaseSub: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", marginTop: 1 },
+  nextPill: { borderRadius: 12, padding: 10, alignItems: "center" },
+  nextPillLabel: { fontSize: 10, fontFamily: "PlusJakartaSans_500Medium" },
+  nextPillDays: { fontSize: 18, fontFamily: "PlusJakartaSans_700Bold", marginTop: 1 },
+  phaseExpect: { fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", lineHeight: 19 },
+  // Luna button bar
+  lunaBar: { paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1 },
+  lunaBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16, borderRadius: 16 },
+  lunaBtnGlyph: { fontSize: 18, color: "#fff" },
+  lunaBtnText: { fontSize: 17, fontFamily: "PlusJakartaSans_700Bold" },
+  // Chat (used in Luna modal)
   emptyContainer: { flex: 1 },
   msgList: { paddingHorizontal: 14, paddingVertical: 8 },
   inputArea: { borderTopWidth: 1, paddingTop: 8, paddingHorizontal: 14 },
@@ -762,8 +886,18 @@ const s = StyleSheet.create({
   sendIcon: { fontSize: 20, fontFamily: "PlusJakartaSans_700Bold" },
 });
 
+const lm = StyleSheet.create({
+  root: { flex: 1 },
+  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1, gap: 12 },
+  avatar: { width: 40, height: 40, borderRadius: 20, justifyContent: "center", alignItems: "center" },
+  avatarGlyph: { fontSize: 18, color: "#fff" },
+  name: { fontSize: 17, fontFamily: "PlusJakartaSans_700Bold" },
+  sub: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", marginTop: 1 },
+  close: { fontSize: 20, paddingHorizontal: 4 },
+});
+
 const ce = StyleSheet.create({
-  container: { padding: 14, gap: 10 },
+  container: { padding: 4, gap: 10 },
   titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   title: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold" },
   close: { fontSize: 16 },

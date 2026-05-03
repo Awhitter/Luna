@@ -103,6 +103,9 @@ export const T: Record<string, TR> = {
   month:  { en: "Month",  es: "Mes",    pt: "Mês"    },
 
   // ── Week screen ───────────────────────────────────────────────────────────
+  planWithLuna: { en: "Plan with Luna",                 es: "Planificar con Luna",          pt: "Planejar com Luna"              },
+  todaysTasks:  { en: "Today's Tasks",                 es: "Tareas de Hoy",                pt: "Tarefas de Hoje"                },
+  seeAll:       { en: "See all",                       es: "Ver todo",                     pt: "Ver tudo"                       },
   thisWeek:     { en: "This Week",                     es: "Esta Semana",                  pt: "Esta Semana"                    },
   taskProgress: { en: "Task Progress",                 es: "Progreso de Tareas",           pt: "Progresso das Tarefas"          },
   dayOfCycle:   { en: "Day {n} of cycle",              es: "Día {n} del ciclo",            pt: "Dia {n} do ciclo"               },
