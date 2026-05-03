@@ -22,6 +22,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "calendar", selected: "calendar" }} />
         <Label>{t("tabWeek")}</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="month">
+        <Icon sf={{ default: "calendar.badge.clock", selected: "calendar.badge.clock" }} />
+        <Label>{t("tabMonth")}</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="cycle">
         <Icon sf={{ default: "moon.stars", selected: "moon.stars.fill" }} />
         <Label>{t("tabCycle")}</Label>
@@ -86,6 +90,14 @@ function ClassicTabLayout() {
           title: t("tabWeek"),
           tabBarIcon: ({ color }) =>
             isIOS ? <SymbolView name="calendar" tintColor={color} size={24} /> : <Feather name="calendar" size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="month"
+        options={{
+          title: t("tabMonth"),
+          tabBarIcon: ({ color }) =>
+            isIOS ? <SymbolView name="calendar.badge.clock" tintColor={color} size={24} /> : <Feather name="grid" size={22} color={color} />,
         }}
       />
       <Tabs.Screen

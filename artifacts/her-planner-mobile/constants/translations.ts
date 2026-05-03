@@ -150,6 +150,20 @@ export const T: Record<string, TR> = {
   symAcne:         { en: "Acne",           es: "Acné",                  pt: "Acne"                 },
   symCravings:     { en: "Cravings",       es: "Antojos",               pt: "Desejos"              },
 
+  // ── Month screen ──────────────────────────────────────────────────────────
+  tabMonth:      { en: "Month",          es: "Mes",             pt: "Mês"              },
+  monthTitle:    { en: "Month",          es: "Mes",             pt: "Mês"              },
+  cyclePhases:   { en: "CYCLE PHASES",   es: "FASES DEL CICLO", pt: "FASES DO CICLO"   },
+  noContext:     { en: "No check-in logged", es: "Sin check-in registrado", pt: "Sem check-in registrado" },
+  tapADay:       { en: "Tap a day to see details", es: "Toca un día para ver detalles", pt: "Toque em um dia para ver detalhes" },
+  dailyContext:  { en: "Daily Check-in", es: "Check-in Diario",  pt: "Check-in Diário"  },
+  todayTasks:    { en: "Today's Tasks",  es: "Tareas de hoy",   pt: "Tarefas de hoje"  },
+
+  // ── Today scores ──────────────────────────────────────────────────────────
+  mood:          { en: "Mood",           es: "Ánimo",           pt: "Humor"            },
+  energy:        { en: "Energy",         es: "Energía",         pt: "Energia"          },
+  sleep:         { en: "Sleep",          es: "Sueño",           pt: "Sono"             },
+
   // ── Profile screen ────────────────────────────────────────────────────────
   myProfile:       { en: "My Profile",        es: "Mi Perfil",             pt: "Meu Perfil"           },
   yourName:        { en: "YOUR NAME",          es: "TU NOMBRE",             pt: "SEU NOME"             },

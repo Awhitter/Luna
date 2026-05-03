@@ -88,7 +88,7 @@ export default function TodayScreen() {
   const inputRef = useRef<TextInput>(null);
   const isWeb = Platform.OS === "web";
   const topPad = isWeb ? 67 : insets.top;
-  const bottomPad = isWeb ? 34 : insets.bottom;
+  const bottomPad = isWeb ? 90 : insets.bottom;
 
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -334,26 +334,34 @@ export default function TodayScreen() {
                 {t(`phase${phaseKey.charAt(0).toUpperCase() + phaseKey.slice(1)}` as "phaseMenstrual")}
                 {phase?.dayInCycle != null ? ` · ${t("dayShort", { n: phase.dayInCycle })}` : ""}
               </Text>
+              {phase?.nextPeriodIn != null && (
+                <Text style={[s.pillText, { color: colors.mutedForeground, fontSize: 10 }]}>
+                  {" · "}{t("periodIn", { n: phase.nextPeriodIn })}
+                </Text>
+              )}
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 5 }}>
-              <View style={s.ctxChips}>
-                {todayCtx?.energyLevel != null && (
-                  <View style={[s.ctxChip, { backgroundColor: colors.muted }]}>
-                    <Text style={[s.ctxChipTxt, { color: colors.mutedForeground }]}>⚡ {todayCtx.energyLevel}/5</Text>
+            {todayCtx && (
+              <View style={s.scoresRow}>
+                {todayCtx.mood && (
+                  <View style={[s.scoreCard, { backgroundColor: colors.accent }]}>
+                    <Text style={s.scoreEmoji}>😊</Text>
+                    <Text style={[s.scoreVal, { color: colors.foreground }]}>{todayCtx.mood}</Text>
                   </View>
                 )}
-                {todayCtx?.sleepHours != null && (
-                  <View style={[s.ctxChip, { backgroundColor: colors.muted }]}>
-                    <Text style={[s.ctxChipTxt, { color: colors.mutedForeground }]}>😴 {todayCtx.sleepHours}h</Text>
+                {todayCtx.energyLevel != null && (
+                  <View style={[s.scoreCard, { backgroundColor: "#9b7fc422" }]}>
+                    <Text style={s.scoreEmoji}>⚡</Text>
+                    <Text style={[s.scoreVal, { color: colors.foreground }]}>{todayCtx.energyLevel}/5</Text>
                   </View>
                 )}
-                {phase?.nextPeriodIn != null && (
-                  <View style={[s.ctxChip, { backgroundColor: colors.muted }]}>
-                    <Text style={[s.ctxChipTxt, { color: colors.mutedForeground }]}>📅 {t("periodIn", { n: phase.nextPeriodIn })}</Text>
+                {todayCtx.sleepHours != null && (
+                  <View style={[s.scoreCard, { backgroundColor: "#d4a84322" }]}>
+                    <Text style={s.scoreEmoji}>😴</Text>
+                    <Text style={[s.scoreVal, { color: colors.foreground }]}>{todayCtx.sleepHours}h</Text>
                   </View>
                 )}
               </View>
-            </ScrollView>
+            )}
           </View>
         </View>
 
@@ -735,9 +743,10 @@ const s = StyleSheet.create({
   phasePill: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 100, alignSelf: "flex-start" },
   pillEmoji: { fontSize: 12 },
   pillText: { fontSize: 12, fontFamily: "PlusJakartaSans_600SemiBold" },
-  ctxChips: { flexDirection: "row", gap: 6 },
-  ctxChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100 },
-  ctxChipTxt: { fontSize: 11, fontFamily: "PlusJakartaSans_500Medium" },
+  scoresRow: { flexDirection: "row", gap: 5, marginTop: 5, flexWrap: "wrap" },
+  scoreCard: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 100 },
+  scoreEmoji: { fontSize: 12 },
+  scoreVal: { fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold" },
   checkinBanner: { borderTopWidth: 1 },
   checkinBannerInner: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 9, gap: 10 },
   checkinBannerText: { flex: 1, fontSize: 13, fontFamily: "PlusJakartaSans_400Regular" },
