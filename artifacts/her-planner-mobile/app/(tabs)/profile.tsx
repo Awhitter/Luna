@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   useCreateProfile,
   useGetProfile,
@@ -20,9 +21,12 @@ import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollV
 import { useColors } from "@/hooks/useColors";
 
 const LANGUAGES = [
-  { code: "en", label: "EN" },
-  { code: "es", label: "ES" },
-  { code: "pt", label: "PT" },
+  { code: "en", label: "English", flag: "🇬🇧" },
+  { code: "es", label: "Español", flag: "🇪🇸" },
+  { code: "pt", label: "Português", flag: "🇧🇷" },
+  { code: "fr", label: "Français", flag: "🇫🇷" },
+  { code: "de", label: "Deutsch", flag: "🇩🇪" },
+  { code: "it", label: "Italiano", flag: "🇮🇹" },
 ];
 
 const WORK_SCHEDULES = [
@@ -34,6 +38,8 @@ const WORK_SCHEDULES = [
 ];
 
 const KID_COUNTS = [1, 2, 3, 4, 5];
+
+const LANG_STORAGE_KEY = "her-planner-language";
 
 export default function ProfileScreen() {
   const colors = useColors();
@@ -51,8 +57,15 @@ export default function ProfileScreen() {
   const [numberOfKids, setNumberOfKids] = useState(1);
   const [workSchedule, setWorkSchedule] = useState("full-time");
   const [healthConditions, setHealthConditions] = useState("");
+  const [language, setLanguage] = useState("en");
   const [saved, setSaved] = useState(false);
   const initialized = useRef(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(LANG_STORAGE_KEY).then((val) => {
+      if (val) setLanguage(val);
+    });
+  }, []);
 
   useEffect(() => {
     if (profile && !initialized.current) {
@@ -64,6 +77,12 @@ export default function ProfileScreen() {
       setHealthConditions(profile.healthConditions ?? "");
     }
   }, [profile]);
+
+  async function handleLanguageSelect(code: string) {
+    Haptics.selectionAsync();
+    setLanguage(code);
+    await AsyncStorage.setItem(LANG_STORAGE_KEY, code);
+  }
 
   async function handleSave() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -104,6 +123,7 @@ export default function ProfileScreen() {
         </View>
       ) : (
         <>
+          {/* Name */}
           <View style={s.section}>
             <Text style={[s.label, { color: colors.mutedForeground }]}>YOUR NAME</Text>
             <TextInput
@@ -117,6 +137,43 @@ export default function ProfileScreen() {
             />
           </View>
 
+          {/* Language */}
+          <View style={s.section}>
+            <Text style={[s.label, { color: colors.mutedForeground }]}>LUNA'S LANGUAGE</Text>
+            <Text style={[s.sublabel, { color: colors.mutedForeground }]}>
+              Luna will respond in your chosen language
+            </Text>
+            <View style={s.langGrid}>
+              {LANGUAGES.map((lang) => {
+                const selected = language === lang.code;
+                return (
+                  <Pressable
+                    key={lang.code}
+                    onPress={() => handleLanguageSelect(lang.code)}
+                    style={[
+                      s.langBtn,
+                      {
+                        backgroundColor: selected ? colors.primary : colors.card,
+                        borderColor: selected ? colors.primary : colors.border,
+                      },
+                    ]}
+                  >
+                    <Text style={s.langFlag}>{lang.flag}</Text>
+                    <Text style={[s.langLabel, { color: selected ? colors.primaryForeground : colors.foreground }]}>
+                      {lang.label}
+                    </Text>
+                    {selected && (
+                      <View style={[s.langCheck, { backgroundColor: colors.primaryForeground + "33" }]}>
+                        <Text style={[s.langCheckTxt, { color: colors.primaryForeground }]}>✓</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Work schedule */}
           <View style={s.section}>
             <Text style={[s.label, { color: colors.mutedForeground }]}>WORK SCHEDULE</Text>
             <View style={s.chipRow}>
@@ -140,6 +197,7 @@ export default function ProfileScreen() {
             </View>
           </View>
 
+          {/* Kids */}
           <View style={s.section}>
             <Text style={[s.label, { color: colors.mutedForeground }]}>DO YOU HAVE KIDS?</Text>
             <View style={s.toggleRow}>
@@ -184,6 +242,7 @@ export default function ProfileScreen() {
             )}
           </View>
 
+          {/* Health conditions */}
           <View style={s.section}>
             <Text style={[s.label, { color: colors.mutedForeground }]}>HEALTH CONDITIONS</Text>
             <Text style={[s.sublabel, { color: colors.mutedForeground }]}>
@@ -209,7 +268,7 @@ export default function ProfileScreen() {
               <ActivityIndicator size="small" color={colors.primaryForeground} />
             ) : (
               <Text style={[s.saveBtnText, { color: saved ? colors.primary : colors.primaryForeground }]}>
-                {saved ? "Saved" : "Save Profile"}
+                {saved ? "✓ Saved" : "Save Profile"}
               </Text>
             )}
           </Pressable>
@@ -244,15 +303,25 @@ const s = StyleSheet.create({
     minHeight: 90,
     textAlignVertical: "top",
   },
-  segmentRow: { flexDirection: "row", gap: 10 },
-  segmentBtn: {
-    flex: 1,
-    paddingVertical: 14,
+  langGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  langBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     borderRadius: 12,
     borderWidth: 1,
-    alignItems: "center",
+    minWidth: "47%",
   },
-  segmentText: { fontSize: 15, fontFamily: "PlusJakartaSans_600SemiBold" },
+  langFlag: { fontSize: 18 },
+  langLabel: { flex: 1, fontSize: 14, fontFamily: "PlusJakartaSans_500Medium" },
+  langCheck: { width: 20, height: 20, borderRadius: 10, justifyContent: "center", alignItems: "center" },
+  langCheckTxt: { fontSize: 11, fontFamily: "PlusJakartaSans_700Bold" },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   chip: {
     paddingHorizontal: 16,

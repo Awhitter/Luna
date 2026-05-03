@@ -170,10 +170,19 @@ export default function TodayScreen() {
     } catch {}
   }
 
+  function handlePromptTap(promptText: string) {
+    sendMessage(promptText);
+  }
+
   async function handleSend() {
     const text = inputText.trim();
     if (!text || isStreaming || !conversationId) return;
     setInputText("");
+    await sendMessage(text);
+  }
+
+  async function sendMessage(text: string) {
+    if (!text || isStreaming || !conversationId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     const userMsg: Message = { id: uid(), role: "user", content: text, ts: Date.now() };
@@ -448,7 +457,7 @@ export default function TodayScreen() {
           )}
           inverted={messages.length > 0}
           ListHeaderComponent={showTyping ? <TypingIndicator colors={colors} /> : null}
-          ListEmptyComponent={<EmptyState colors={colors} name={firstName} />}
+          ListEmptyComponent={<EmptyState colors={colors} name={firstName} onPrompt={handlePromptTap} />}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={messages.length === 0 ? s.emptyContainer : s.msgList}
@@ -699,7 +708,15 @@ const PROMPTS = [
   "I'm feeling overwhelmed",
 ];
 
-function EmptyState({ colors, name }: { colors: ReturnType<typeof import("@/hooks/useColors").useColors>; name: string }) {
+function EmptyState({
+  colors,
+  name,
+  onPrompt,
+}: {
+  colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
+  name: string;
+  onPrompt: (text: string) => void;
+}) {
   return (
     <View style={es.container}>
       <View style={[es.avatar, { backgroundColor: colors.primary }]}>
@@ -713,9 +730,22 @@ function EmptyState({ colors, name }: { colors: ReturnType<typeof import("@/hook
       </Text>
       <View style={es.grid}>
         {PROMPTS.map((p, i) => (
-          <View key={i} style={[es.prompt, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Pressable
+            key={i}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onPrompt(p);
+            }}
+            style={({ pressed }) => [
+              es.prompt,
+              {
+                backgroundColor: pressed ? colors.primary : colors.card,
+                borderColor: pressed ? colors.primary : colors.border,
+              },
+            ]}
+          >
             <Text style={[es.promptText, { color: colors.foreground }]}>{p}</Text>
-          </View>
+          </Pressable>
         ))}
       </View>
     </View>
