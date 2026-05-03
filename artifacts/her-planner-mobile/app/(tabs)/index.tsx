@@ -112,7 +112,6 @@ export default function TodayScreen() {
   const [showTyping, setShowTyping] = useState(false);
   const [showTasks, setShowTasks] = useState(false);
   const [addedTasks, setAddedTasks] = useState<Set<string>>(new Set());
-  const [customSymptom, setCustomSymptom] = useState("");
   const [pendingSymptomText, setPendingSymptomText] = useState("");
   const [showSymptomConfirm, setShowSymptomConfirm] = useState(false);
 
@@ -673,6 +672,9 @@ function CheckinExpanded({
   tCheckinTitle: string; tMood: string; tEnergy: string; tSleep: string;
   tSymptoms: string; tLater: string; tSave: string;
 }) {
+  const { t } = useLanguage();
+  const [customSymptom, setCustomSymptom] = useState("");
+
   function toggleSym(key: string) {
     Haptics.selectionAsync();
     onSymptoms(symptoms.includes(key) ? symptoms.filter((k) => k !== key) : [...symptoms, key]);
@@ -1013,6 +1015,14 @@ const s = StyleSheet.create({
   inputField: { flex: 1, borderWidth: 1, borderRadius: 22, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, fontSize: 15, fontFamily: "PlusJakartaSans_400Regular", maxHeight: 110 },
   sendBtn: { width: 42, height: 42, borderRadius: 21, justifyContent: "center", alignItems: "center", marginBottom: 1 },
   sendIcon: { fontSize: 20, fontFamily: "PlusJakartaSans_700Bold" },
+  // Confirm modal
+  confirmOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 24 },
+  confirmCard: { borderRadius: 20, borderWidth: 1, padding: 22, width: "100%", gap: 12 },
+  confirmTitle: { fontSize: 17, fontFamily: "PlusJakartaSans_700Bold" },
+  confirmBody: { fontSize: 14, fontFamily: "PlusJakartaSans_400Regular", lineHeight: 21 },
+  confirmRow: { flexDirection: "row", gap: 10, marginTop: 4 },
+  confirmBtn: { flex: 1, paddingVertical: 11, borderRadius: 12, alignItems: "center", borderWidth: 1 },
+  confirmBtnText: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold" },
 });
 
 const lm = StyleSheet.create({
