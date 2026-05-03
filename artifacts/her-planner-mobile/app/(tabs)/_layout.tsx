@@ -7,6 +7,7 @@ import { Feather } from "@expo/vector-icons";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
+import { useGetTodayContext } from "@workspace/api-client-react";
 import { useColors } from "@/hooks/useColors";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -45,6 +46,8 @@ function ClassicTabLayout() {
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
+  const { data: todayCtx, isLoading: ctxLoading } = useGetTodayContext();
+  const showTodayBadge = !ctxLoading && !todayCtx;
 
   return (
     <Tabs
@@ -89,6 +92,8 @@ function ClassicTabLayout() {
         name="index"
         options={{
           title: t("tabToday"),
+          tabBarBadge: showTodayBadge ? " " : undefined,
+          tabBarBadgeStyle: { minWidth: 10, height: 10, borderRadius: 5, fontSize: 1, lineHeight: 1 },
           tabBarIcon: ({ color }) =>
             isIOS ? <SymbolView name="sun.max" tintColor={color} size={24} /> : <Feather name="sun" size={22} color={color} />,
         }}

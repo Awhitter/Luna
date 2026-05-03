@@ -364,8 +364,11 @@ export default function TodayScreen() {
                   <Text style={[s.checkinBannerText, { color: colors.foreground }]}>{t("checkinBanner")}</Text>
                   <Text style={[s.checkinBannerNudge, { color: colors.mutedForeground }]}>{t("lunaNudge")}</Text>
                 </View>
-                <View style={[s.checkinBannerBtn, { backgroundColor: colors.primary }]}>
-                  <Text style={[s.checkinBannerBtnTxt, { color: colors.primaryForeground }]}>{t("checkinCheckIn")}</Text>
+                <View style={{ position: "relative" }}>
+                  <View style={[s.checkinBannerBtn, { backgroundColor: colors.primary }]}>
+                    <Text style={[s.checkinBannerBtnTxt, { color: colors.primaryForeground }]}>{t("checkinCheckIn")}</Text>
+                  </View>
+                  <View style={[s.btnBadge, { borderColor: colors.background }]} />
                 </View>
               </Pressable>
             ) : (
@@ -902,6 +905,7 @@ const s = StyleSheet.create({
   checkinBannerNudge: { fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", marginTop: 2, lineHeight: 15 },
   checkinBannerBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 100, flexShrink: 0 },
   checkinBannerBtnTxt: { fontSize: 12, fontFamily: "PlusJakartaSans_600SemiBold" },
+  btnBadge: { position: "absolute", top: -4, right: -4, width: 11, height: 11, borderRadius: 6, backgroundColor: "#e53935", borderWidth: 1.5 },
   // Phase pill
   phasePill: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100, alignSelf: "flex-start", marginBottom: 12 },
   pillEmoji: { fontSize: 13 },
