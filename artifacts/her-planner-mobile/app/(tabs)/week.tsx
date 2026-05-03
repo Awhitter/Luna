@@ -180,31 +180,77 @@ export default function WeekScreen() {
         )}
       </View>
 
-      {/* Week calendar */}
+      {/* Week chart — energy + sleep bars + mood emoji */}
       <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[s.cardTitle, { color: colors.foreground }]}>{t("weekAtGlance")}</Text>
-        <View style={s.weekGrid}>
+        <View style={s.chartGrid}>
           {weekDates.map((d, i) => {
             const iso = toISO(d);
             const isToday = iso === todayISO;
-            const energy = contextByDate[iso]?.energy ?? 0;
-            const barH = energy > 0 ? (energy / 5) * 44 : 0;
+            const ctx = contextByDate[iso];
+            const energy = ctx?.energy ?? 0;
+            const sleep  = ctx?.sleep  ?? 0;
+            const mood   = ctx?.mood   ?? null;
+            const BAR_MAX = 80;
+            const energyH = energy > 0 ? (energy / 5) * BAR_MAX : 0;
+            const sleepH  = sleep  > 0 ? Math.max(4, Math.min(sleep, 10) - 4) / 6 * BAR_MAX : 0;
+            const hasData = energy > 0 || sleep > 0;
             return (
-              <View key={i} style={s.dayCol}>
-                <Text style={[s.dayLetter, { color: isToday ? colors.primary : colors.mutedForeground }]}>
+              <View key={i} style={s.chartCol}>
+                {/* Day label */}
+                <Text style={[s.chartLetter, { color: isToday ? colors.primary : colors.mutedForeground }]}>
                   {DAY_LETTERS_EN[d.getDay()]}
                 </Text>
-                <View style={[s.dayBubble, isToday ? { backgroundColor: colors.primary } : { backgroundColor: "transparent" }]}>
-                  <Text style={[s.dayNum, { color: isToday ? colors.primaryForeground : colors.foreground }]}>{d.getDate()}</Text>
+                <View style={[s.chartBubble, isToday && { backgroundColor: colors.primary }]}>
+                  <Text style={[s.chartNum, { color: isToday ? colors.primaryForeground : colors.foreground }]}>
+                    {d.getDate()}
+                  </Text>
                 </View>
-                <View style={[s.energyTrack, { backgroundColor: colors.muted }]}>
-                  {barH > 0 && <View style={[s.energyBar, { height: barH, backgroundColor: colors.primary + "cc" }]} />}
+                {/* Bar area */}
+                <View style={[s.barsArea, { height: BAR_MAX }]}>
+                  {!hasData && (
+                    <View style={[s.emptyBarTrack, { backgroundColor: colors.muted + "66" }]} />
+                  )}
+                  {hasData && (
+                    <>
+                      {/* Energy bar */}
+                      <View style={[s.barTrack, { backgroundColor: colors.muted }]}>
+                        {energyH > 0 && (
+                          <View style={[s.bar, { height: energyH, backgroundColor: "#d4a843dd" }]} />
+                        )}
+                      </View>
+                      {/* Sleep bar */}
+                      <View style={[s.barTrack, { backgroundColor: colors.muted }]}>
+                        {sleepH > 0 && (
+                          <View style={[s.bar, { height: sleepH, backgroundColor: "#9b7fc4dd" }]} />
+                        )}
+                      </View>
+                    </>
+                  )}
                 </View>
+                {/* Mood emoji */}
+                <Text style={s.chartMood}>
+                  {mood ? (MOOD_EMOJI_MAP[mood.toLowerCase()] ?? "😐") : " "}
+                </Text>
               </View>
             );
           })}
         </View>
-        <Text style={[s.barNote, { color: colors.mutedForeground }]}>{t("energyLogged")}</Text>
+        {/* Legend */}
+        <View style={s.chartLegend}>
+          <View style={s.legendItem}>
+            <View style={[s.legendDot, { backgroundColor: "#d4a843" }]} />
+            <Text style={[s.legendLabel, { color: colors.mutedForeground }]}>{t("checkinEnergy")}</Text>
+          </View>
+          <View style={s.legendItem}>
+            <View style={[s.legendDot, { backgroundColor: "#9b7fc4" }]} />
+            <Text style={[s.legendLabel, { color: colors.mutedForeground }]}>{t("checkinSleep")}</Text>
+          </View>
+          <View style={s.legendItem}>
+            <Text style={s.legendEmoji}>😊</Text>
+            <Text style={[s.legendLabel, { color: colors.mutedForeground }]}>{t("checkinMood")}</Text>
+          </View>
+        </View>
       </View>
 
       {/* By Category */}
@@ -254,14 +300,21 @@ const s = StyleSheet.create({
   nextPillLabel: { fontSize: 10, fontFamily: "PlusJakartaSans_500Medium" },
   nextPillDays: { fontSize: 18, fontFamily: "PlusJakartaSans_700Bold", marginTop: 1 },
   phaseExpect: { fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", lineHeight: 19 },
-  weekGrid: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
-  dayCol: { alignItems: "center", gap: 4, flex: 1 },
-  dayLetter: { fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold" },
-  dayBubble: { width: 26, height: 26, borderRadius: 13, justifyContent: "center", alignItems: "center" },
-  dayNum: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold" },
-  energyTrack: { width: 8, height: 44, borderRadius: 4, overflow: "hidden", justifyContent: "flex-end" },
-  energyBar: { width: 8, borderRadius: 4 },
-  barNote: { fontSize: 10, fontFamily: "PlusJakartaSans_400Regular", textAlign: "center", marginTop: 6 },
+  chartGrid: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
+  chartCol: { alignItems: "center", gap: 3, flex: 1 },
+  chartLetter: { fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold" },
+  chartBubble: { width: 26, height: 26, borderRadius: 13, justifyContent: "center", alignItems: "center" },
+  chartNum: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold" },
+  barsArea: { flexDirection: "row", alignItems: "flex-end", justifyContent: "center", gap: 2, width: "100%" },
+  barTrack: { flex: 1, maxWidth: 10, borderRadius: 5, overflow: "hidden", justifyContent: "flex-end" },
+  bar: { borderRadius: 5, width: "100%" },
+  emptyBarTrack: { width: 6, height: "100%", borderRadius: 3 },
+  chartMood: { fontSize: 14, height: 20, textAlign: "center" },
+  chartLegend: { flexDirection: "row", justifyContent: "center", gap: 16, marginTop: 4 },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendEmoji: { fontSize: 11, lineHeight: 14 },
+  legendLabel: { fontSize: 10, fontFamily: "PlusJakartaSans_400Regular" },
   catRow: { marginBottom: 12 },
   catLabelRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 5 },
   catDot: { width: 8, height: 8, borderRadius: 4 },
