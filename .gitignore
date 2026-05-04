@@ -47,3 +47,10 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Local and deployment secrets/state
+.env
+.env.*
+!.env.example
+.vercel/
+.vercel

@@ -2,7 +2,7 @@ import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { db, conversations, messages, profiles, cycleEntries, dailyContexts, tasks } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
-import { openai } from "@workspace/integrations-openai-ai-server";
+import { defaultChatModel, openai } from "@workspace/integrations-openai-ai-server/client";
 import {
   CreateOpenaiConversationBody,
   SendOpenaiMessageBody,
@@ -215,7 +215,7 @@ router.post("/openai/conversations/:id/messages", aiRateLimit, async (req, res) 
 
     let fullResponse = "";
     const stream = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: defaultChatModel,
       max_tokens: 1024,
       messages: chatMessages,
       stream: true,
@@ -298,7 +298,7 @@ IMPORTANT: Write the entire message in ${langName}.
 Respond ONLY with JSON: {"message": "your message here"}`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: defaultChatModel,
       max_tokens: 300,
       messages: [
         { role: "system", content: `You are Luna, a warm AI best friend assistant. Always respond in ${langName}.` },
@@ -353,7 +353,7 @@ Respond ONLY with valid JSON:
 {"message":"A short warm 1-sentence note in ${langName}","suggestions":[{"title":"task title (in ${langName})","category":"work|home|health|kids|self-care|food","priority":"low|medium|high","reason":"one short phrase in ${langName} why this fits today"}]}`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: defaultChatModel,
       max_tokens: 512,
       messages: [
         { role: "system", content: systemContext },
@@ -422,7 +422,7 @@ router.post("/openai/weekly-recap", aiRateLimit, async (req, res) => {
 - Days logged: ${recentContexts.length} out of 7`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: defaultChatModel,
       max_tokens: 200,
       messages: [
         { role: "system", content: systemContext },

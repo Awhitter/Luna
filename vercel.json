@@ -1,0 +1,30 @@
+{
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --filter @workspace/api-server build && PORT=3000 BASE_PATH=/ pnpm --filter @workspace/her-planner build",
+  "outputDirectory": "artifacts/her-planner/dist/public",
+  "functions": {
+    "api/index.mjs": {
+      "maxDuration": 60
+    },
+    "api/[...path].mjs": {
+      "maxDuration": 60
+    }
+  },
+  "routes": [
+    {
+      "src": "^/api$",
+      "dest": "/api/index"
+    },
+    {
+      "src": "^/api/(.+)$",
+      "dest": "/api/[...path]?...path=$1"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "^(?:/(.*))$",
+      "dest": "/index.html"
+    }
+  ]
+}
