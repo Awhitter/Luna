@@ -1,0 +1,27 @@
+# Dependencies are installed by Vercel from pnpm-lock.yaml.
+node_modules
+**/node_modules
+
+# Local build/cache output.
+.vercel
+.vercel/
+.local
+.local/
+.cache
+.cache/
+dist
+**/dist
+.expo
+**/.expo
+coverage
+**/coverage
+*.tsbuildinfo
+
+# Local-only generated/development artifacts.
+attached_assets
+attached_assets/
+
+# Editor and OS noise.
+.DS_Store
+.idea
+.vscode
