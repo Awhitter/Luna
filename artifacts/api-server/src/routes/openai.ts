@@ -22,6 +22,8 @@ import {
   getMessagesForPrompt,
   maybeAutoSummarize,
   buildLunaTools,
+  getIntent,
+  toolsForIntent,
 } from "../lib/luna";
 
 const router = Router();
@@ -103,6 +105,10 @@ const SendMessageBody = z.object({
   content: z.string().min(1),
   language: z.string().optional(),
   symptoms: z.array(z.string()).optional(),
+  intentId: z
+    .enum(["find_ways", "solve", "make", "listen", "feel"])
+    .optional(),
+  intentFill: z.string().max(500).optional(),
 });
 
 async function loadLunaContext(language: string, extraSymptoms?: string[]) {
@@ -132,22 +138,35 @@ router.post("/openai/conversations/:id/messages", aiRateLimit, async (req, res) 
     if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
 
     const convId = idParsed.data.id;
-    const { content, language = "es", symptoms } = parsed.data;
+    const { content, language = "es", symptoms, intentId, intentFill } = parsed.data;
 
     const conv = await db.select().from(conversations).where(eq(conversations.id, convId));
     if (conv.length === 0) return res.status(404).json({ error: "Conversation not found" });
 
-    await db.insert(messages).values({ conversationId: convId, role: "user", content });
+    await db.insert(messages).values({
+      conversationId: convId,
+      role: "user",
+      content,
+      intentId: intentId ?? null,
+      intentFill: intentFill ?? null,
+    });
 
     const ctx = await loadLunaContext(language, symptoms);
     const memories = await recall(content, 5);
     const { recent, summary } = await getMessagesForPrompt(convId);
+    const intent = getIntent(intentId);
 
-    const systemContext = buildSystemContext({
-      ...ctx,
-      memories,
-      conversationSummary: summary ?? undefined,
-    });
+    const systemContext =
+      buildSystemContext({
+        ...ctx,
+        memories,
+        conversationSummary: summary ?? undefined,
+      }) +
+      (intent
+        ? `\n\n## Active intent: ${intent.id}\n${intent.systemNudge}${
+            intentFill ? `\nUser fill-in: ${intentFill}` : ""
+          }`
+        : "");
 
     const modelMessages: ModelMessage[] = recent
       .filter((m) => m.role === "user" || m.role === "assistant")
@@ -156,14 +175,14 @@ router.post("/openai/conversations/:id/messages", aiRateLimit, async (req, res) 
         content: m.content,
       }));
 
-    const tools = buildLunaTools({ conversationId: convId });
+    const allTools = buildLunaTools({ conversationId: convId });
+    const tools = toolsForIntent(allTools, intentId);
 
     const result = streamText({
       model: getModel(ctx.agent.model),
       system: systemContext,
       messages: modelMessages,
-      tools,
-      toolChoice: "auto",
+      ...(tools ? { tools, toolChoice: "auto" as const } : {}),
       temperature: ctx.agent.temperature,
       maxOutputTokens: ctx.agent.maxTokens,
       stopWhen: stepCountIs(5),

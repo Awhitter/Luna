@@ -108,6 +108,7 @@ export default function TodayScreen() {
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
+  const [activeIntent, setActiveIntent] = useState<"find_ways" | "solve" | "make" | "listen" | "feel" | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [showTyping, setShowTyping] = useState(false);
   const [showTasks, setShowTasks] = useState(false);
@@ -226,6 +227,9 @@ export default function TodayScreen() {
     if (!text || isStreaming || !conversationId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
+    const intentId = activeIntent;
+    setActiveIntent(null);
+
     const userMsg: Message = { id: uid(), role: "user", content: text, ts: Date.now() };
     setMessages((prev) => [...prev, userMsg]);
     setIsStreaming(true);
@@ -241,7 +245,12 @@ export default function TodayScreen() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-          body: JSON.stringify({ content: text, language, symptoms: todaySymptoms.length > 0 ? todaySymptoms : undefined }),
+          body: JSON.stringify({
+            content: text,
+            language,
+            symptoms: todaySymptoms.length > 0 ? todaySymptoms : undefined,
+            ...(intentId ? { intentId } : {}),
+          }),
         }
       );
       if (!response.ok) throw new Error("Request failed");
@@ -579,6 +588,36 @@ export default function TodayScreen() {
             />
             <View style={[s.inputArea, { paddingBottom: isWeb ? 34 : insets.bottom + 6, borderTopColor: colors.border, backgroundColor: colors.background }]}>
               <Text style={[s.inputLabel, { color: colors.mutedForeground }]}>{t("planYourDay")}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 6, paddingHorizontal: 2 }}>
+                {([
+                  { id: "find_ways" as const, es: "Formas", en: "Find ways", pt: "Formas", draft: { es: "Encuentra formas de ", en: "Find ways to ", pt: "Encontre formas de " } },
+                  { id: "solve" as const, es: "Resuelve", en: "Solve", pt: "Resolva", draft: { es: "Resuelve esto por mí: ", en: "Solve this for me: ", pt: "Resolva isto por mim: " } },
+                  { id: "make" as const, es: "Crear", en: "Make", pt: "Criar", draft: { es: "Ayúdame a crear ", en: "Help me make ", pt: "Me ajude a criar " } },
+                  { id: "listen" as const, es: "Escúchame", en: "Hear me", pt: "Me escuta", draft: { es: "¿Me escuchas sobre…? ", en: "Will you hear me about…? ", pt: "Você me escuta sobre…? " } },
+                  { id: "feel" as const, es: "Sentirme", en: "Feel", pt: "Sentir", draft: { es: "Quiero sentirme ", en: "I want to feel ", pt: "Quero me sentir " } },
+                ]).map((chip) => (
+                  <Pressable
+                    key={chip.id}
+                    onPress={() => {
+                      setActiveIntent(chip.id);
+                      const draft = chip.draft[language] ?? chip.draft.es;
+                      setInputText((prev) => (prev.trim() ? prev : draft));
+                    }}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      borderColor: activeIntent === chip.id ? colors.primary : colors.border,
+                      backgroundColor: activeIntent === chip.id ? colors.primary + "22" : colors.card,
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: "600", color: activeIntent === chip.id ? colors.primary : colors.mutedForeground }}>
+                      {chip[language] ?? chip.es}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
               <View style={s.inputRow}>
                 <TextInput
                   ref={inputRef}

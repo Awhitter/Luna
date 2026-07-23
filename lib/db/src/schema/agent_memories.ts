@@ -10,6 +10,8 @@ export const agentMemories = pgTable("agent_memories", {
   conversationId: integer("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
   content: text("content").notNull(),
   source: text("source").notNull().default("luna"),
+  /** household | prefs | kids | recipes | taste | episodic | money_goals | health */
+  category: text("category"),
   embedding: vector("embedding", { dimensions: 1536 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [

@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import { Send, Moon, CheckCircle2, Circle, Plus, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/i18n/context";
+import { IntentLegend, type IntentId } from "@/components/intent-legend";
 
 type ChatMessage = { role: "user" | "assistant"; content: string; streaming?: boolean };
 
@@ -107,6 +108,7 @@ export default function TodayPage() {
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  const [activeIntent, setActiveIntent] = useState<IntentId | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [conversationId, setConversationId] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -135,6 +137,19 @@ export default function TodayPage() {
   useEffect(() => {
     if (!profileLoading && !profile) setLocation("/settings");
   }, [profile, profileLoading, setLocation]);
+
+  useEffect(() => {
+    const draft = localStorage.getItem("luna-pending-draft");
+    const intent = localStorage.getItem("luna-pending-intent") as IntentId | null;
+    if (draft) {
+      setInput(draft);
+      localStorage.removeItem("luna-pending-draft");
+    }
+    if (intent) {
+      setActiveIntent(intent);
+      localStorage.removeItem("luna-pending-intent");
+    }
+  }, []);
 
   useEffect(() => {
     if (!profile) return;
@@ -312,7 +327,13 @@ export default function TodayPage() {
   const sendMessage = useCallback(async () => {
     if (!input.trim() || isStreaming || !conversationId) return;
     const userMsg = input.trim();
+    const intentId = activeIntent;
+    const intentFill =
+      intentId && userMsg.length > 0
+        ? userMsg.replace(/^(Encuentra formas de |Find ways to |Encontre formas de |Resuelve esto por mí: |Solve this for me: |Resolva isto por mim: |Ayúdame a crear |Help me make |Me ajude a criar |¿Me escuchas sobre…\? |Will you hear me about…\? |Você me escuta sobre…\? |Quiero sentirme |I want to feel |Quero me sentir )/i, "").trim()
+        : undefined;
     setInput("");
+    setActiveIntent(null);
     setMessages((prev) => [...prev, { role: "user", content: userMsg }]);
     setIsStreaming(true);
     setMessages((prev) => [...prev, { role: "assistant", content: "", streaming: true }]);
@@ -321,7 +342,11 @@ export default function TodayPage() {
       const res = await fetch(`/api/openai/conversations/${conversationId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: userMsg, language: lang }),
+        body: JSON.stringify({
+          content: userMsg,
+          language: lang,
+          ...(intentId ? { intentId, intentFill } : {}),
+        }),
       });
       if (!res.body) throw new Error("No stream");
       const reader = res.body.getReader();
@@ -352,7 +377,7 @@ export default function TodayPage() {
     } finally {
       setIsStreaming(false);
     }
-  }, [input, isStreaming, conversationId, parseTasks, queryClient, lang, t]);
+  }, [input, activeIntent, isStreaming, conversationId, parseTasks, queryClient, lang, t]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -450,6 +475,14 @@ export default function TodayPage() {
         </div>
 
         <div className="pb-2 pt-2 border-t border-border">
+          <IntentLegend
+            activeIntent={activeIntent}
+            onSelect={(intentId, draftStem) => {
+              setActiveIntent(intentId);
+              // Editable draft only — never auto-submit
+              setInput((prev) => (prev.trim() ? prev : draftStem));
+            }}
+          />
           <div className="flex gap-2 items-end bg-card rounded-2xl border border-border px-3 py-2 focus-within:border-primary/50 transition-colors">
             <textarea
               value={input}

@@ -118,6 +118,39 @@ export default function SettingsPage() {
       </header>
 
       <div className="flex-1 px-5 pb-8">
+        {!isOnboarding && (
+          <div className="mb-5 bg-card rounded-2xl border border-border p-4">
+            <p className="text-sm font-medium mb-1">
+              {lang === "es" ? "Conóceme" : lang === "pt" ? "Me conheça" : "Get to know me"}
+            </p>
+            <p className="text-xs text-muted-foreground mb-3">
+              {lang === "es"
+                ? "Luna te hace preguntas con calma (hijos, trabajo, gustos). Tú eliges qué compartir."
+                : lang === "pt"
+                  ? "Luna faz perguntas com calma (filhos, trabalho, gostos). Você escolhe o que compartilhar."
+                  : "Luna asks gently (kids, work, tastes). You choose what to share."}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl w-full"
+              onClick={() => {
+                const draft =
+                  lang === "es"
+                    ? "Conóceme: quiero que me hagas preguntas con calma sobre mi vida, mis hijos y lo que te ayude a cuidarme mejor."
+                    : lang === "pt"
+                      ? "Me conheça: quero que você me faça perguntas com calma sobre minha vida, meus filhos e o que te ajuda a cuidar de mim."
+                      : "Get to know me: ask me calm questions about my life, kids, and what helps you support me.";
+                localStorage.setItem("luna-pending-draft", draft);
+                localStorage.setItem("luna-pending-intent", "listen");
+                setLocation("/");
+              }}
+            >
+              {lang === "es" ? "Empezar Conóceme" : lang === "pt" ? "Começar" : "Start interview"}
+            </Button>
+          </div>
+        )}
+
         {/* Language selector */}
         <div className="mb-5 bg-card rounded-2xl border border-border p-4">
           <p className="text-sm font-medium mb-3">{t.settings.languageLabel}</p>

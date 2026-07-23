@@ -48,6 +48,22 @@ export function buildSystemContext(input: BuildContextInput): string {
     if (profile.exercisePerWeek != null) ctx += `\n- Exercise: ${profile.exercisePerWeek}x/week${profile.exerciseIntensity ? ` (${profile.exerciseIntensity} intensity)` : ""}`;
     if (profile.contraception && profile.contraception !== "unknown") ctx += `\n- Contraception: ${profile.contraception} — factor this into cycle and symptom advice`;
     if (profile.hydration) ctx += `\n- Hydration habit: ${profile.hydration} — mention hydration tips when relevant`;
+    if (profile.kidsJson) {
+      try {
+        const kids = JSON.parse(profile.kidsJson) as Array<{ name?: string; age?: number; allergies?: string; notes?: string }>;
+        if (Array.isArray(kids) && kids.length > 0) {
+          ctx += `\n- Kids detail: ${kids
+            .map((k) =>
+              [k.name, k.age != null ? `${k.age}y` : null, k.allergies ? `allergies: ${k.allergies}` : null, k.notes]
+                .filter(Boolean)
+                .join(", "),
+            )
+            .join("; ")}`;
+        }
+      } catch {
+        /* ignore bad JSON */
+      }
+    }
     if (profile.pendingLunaNote) {
       ctx += `\n\n⚡ RECENT PROFILE UPDATE (she just changed something important): ${profile.pendingLunaNote} Acknowledge this warmly and naturally early in your reply — like a caring friend who noticed. Don't read it like a list; weave it in naturally.`;
     }

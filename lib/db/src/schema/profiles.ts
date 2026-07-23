@@ -18,6 +18,8 @@ export const profiles = pgTable("profiles", {
   contraception: text("contraception"),
   hydration: text("hydration"),
   pendingLunaNote: text("pending_luna_note"),
+  /** JSON array of {name, age?, allergies?, notes?} — consented Conóceme data */
+  kidsJson: text("kids_json"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
