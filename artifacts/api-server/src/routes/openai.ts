@@ -132,7 +132,7 @@ router.post("/openai/conversations/:id/messages", aiRateLimit, async (req, res) 
     if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
 
     const convId = idParsed.data.id;
-    const { content, language = "en", symptoms } = parsed.data;
+    const { content, language = "es", symptoms } = parsed.data;
 
     const conv = await db.select().from(conversations).where(eq(conversations.id, convId));
     if (conv.length === 0) return res.status(404).json({ error: "Conversation not found" });
@@ -197,7 +197,7 @@ router.post("/openai/conversations/:id/messages", aiRateLimit, async (req, res) 
 
 router.post("/openai/checkin-message", aiRateLimit, async (req, res) => {
   try {
-    const { sleepHours, energyLevel, mood, language = "en", conversationId: convId } = req.body as {
+    const { sleepHours, energyLevel, mood, language = "es", conversationId: convId } = req.body as {
       sleepHours?: number;
       energyLevel?: number;
       mood?: string;
@@ -207,12 +207,12 @@ router.post("/openai/checkin-message", aiRateLimit, async (req, res) => {
 
     const ctx = await loadLunaContext(language);
     const cycleContext = computeCyclePhaseSnippet(ctx.profile, ctx.lastPeriod);
-    const langName = LANGUAGE_NAMES[language] ?? "English";
+    const langName = LANGUAGE_NAMES[language] ?? "Spanish";
     const name = ctx.profile?.name ?? "there";
 
     const checkinSummary = [
       sleepHours ? `Sleep: ${sleepHours} hours last night` : null,
-      energyLevel ? `Energy: ${energyLevel}/10` : null,
+      energyLevel ? `Energy: ${energyLevel}/5` : null,
       mood ? `Mood: ${mood}` : null,
       cycleContext || null,
       ctx.pendingTasks.length > 0 ? `Already on her list: ${ctx.pendingTasks.map((t) => t.title).join(", ")}` : null,
@@ -253,7 +253,7 @@ router.post("/openai/suggest-tasks", aiRateLimit, async (req, res) => {
     const ctx = await loadLunaContext(language);
     const memories = await recall("today's plan and how she usually likes to spend her days", 5);
     const systemContext = buildSystemContext({ ...ctx, memories });
-    const langName = LANGUAGE_NAMES[language] ?? "English";
+    const langName = LANGUAGE_NAMES[language] ?? "Spanish";
 
     const SuggestionSchema = z.object({
       message: z.string(),
@@ -293,14 +293,14 @@ Write the "message" and "reason" fields entirely in ${langName}.`,
 
 router.post("/openai/profile-greeting", aiRateLimit, async (req, res) => {
   try {
-    const { language = "en", conversationId: convId, planWithLuna = false } = req.body as {
+    const { language = "es", conversationId: convId, planWithLuna = false } = req.body as {
       language?: string;
       conversationId?: number;
       planWithLuna?: boolean;
     };
 
     const ctx = await loadLunaContext(language);
-    const langName = LANGUAGE_NAMES[language] ?? "English";
+    const langName = LANGUAGE_NAMES[language] ?? "Spanish";
     const name = ctx.profile?.name ?? "there";
     const todayISO = new Date().toISOString().split("T")[0];
     const hasCheckin = ctx.today?.date === todayISO;
@@ -395,11 +395,11 @@ router.post("/openai/weekly-recap", aiRateLimit, async (req, res) => {
 
     const memories = await recall("recurring patterns this week", 4);
     const systemContext = buildSystemContext({ ...ctx, memories });
-    const langName = LANGUAGE_NAMES[language] ?? "English";
+    const langName = LANGUAGE_NAMES[language] ?? "Spanish";
 
     const statsContext = `This week's data:
 - Tasks: ${completedTasks} completed out of ${totalTasks} total
-- Average energy: ${avgEnergy !== null ? avgEnergy.toFixed(1) + "/10" : "no data"}
+- Average energy: ${avgEnergy !== null ? avgEnergy.toFixed(1) + "/5" : "no data"}
 - Average sleep: ${avgSleep !== null ? avgSleep.toFixed(1) + " hours" : "no data"}
 - Most common mood: ${topMood || "no data"}
 - Days logged: ${recentContexts.length} out of 7`;

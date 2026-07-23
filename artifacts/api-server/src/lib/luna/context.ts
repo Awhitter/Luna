@@ -31,7 +31,7 @@ export function buildSystemContext(input: BuildContextInput): string {
     lastPeriod,
     today,
     pendingTasks,
-    language = "en",
+    language = "es",
     symptoms,
     memories,
     conversationSummary,
@@ -94,7 +94,7 @@ export function buildSystemContext(input: BuildContextInput): string {
   }
 
   if (language && language !== "en") {
-    const langName = LANGUAGE_NAMES[language] ?? "English";
+    const langName = LANGUAGE_NAMES[language] ?? "Spanish";
     ctx += `\n\nIMPORTANT: Always respond in ${langName}. Every response must be written entirely in ${langName}.`;
   }
 

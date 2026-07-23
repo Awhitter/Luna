@@ -25,8 +25,8 @@ const phaseBarColors: Record<string, string> = {
 
 function getEnergyColor(level: number | null): string {
   if (!level) return "#e5e7eb";
-  if (level >= 8) return "hsl(var(--primary))";
-  if (level >= 5) return "hsl(var(--primary) / 0.65)";
+  if (level >= 4) return "hsl(var(--primary))";
+  if (level >= 3) return "hsl(var(--primary) / 0.65)";
   return "hsl(var(--primary) / 0.35)";
 }
 
@@ -160,7 +160,7 @@ export default function WeekPage() {
             </div>
             <div className="flex items-center gap-3">
               {avgEnergy !== null && (
-                <span className="text-xs text-muted-foreground">{t.week.avgEnergy} {avgEnergy.toFixed(1)}/10</span>
+                <span className="text-xs text-muted-foreground">{t.week.avgEnergy} {avgEnergy.toFixed(1)}/5</span>
               )}
               {cyclePhase && cyclePhase.phase !== "unknown" && (
                 <span
@@ -184,7 +184,7 @@ export default function WeekPage() {
                   return (
                     <div className="bg-card border border-border rounded-xl px-3 py-2 shadow-lg text-xs">
                       <p className="font-medium text-foreground mb-0.5">{d.day}</p>
-                      {d.energy ? <p className="text-muted-foreground">⚡ {d.energy}/10</p> : <p className="text-muted-foreground">—</p>}
+                      {d.energy ? <p className="text-muted-foreground">⚡ {d.energy}/5</p> : <p className="text-muted-foreground">—</p>}
                       {d.sleep ? <p className="text-muted-foreground">🌙 {d.sleep}h</p> : null}
                       {d.mood ? <p className="text-muted-foreground capitalize">🌸 {t.moods[d.mood] ?? d.mood}</p> : null}
                     </div>
@@ -280,7 +280,7 @@ export default function WeekPage() {
                 )}
                 {recap.stats.avgEnergy !== null && (
                   <div className="bg-card/70 rounded-xl p-2.5 text-center">
-                    <p className="text-sm font-bold text-foreground">{recap.stats.avgEnergy.toFixed(1)}<span className="text-xs font-normal text-muted-foreground">/10</span></p>
+                    <p className="text-sm font-bold text-foreground">{recap.stats.avgEnergy.toFixed(1)}<span className="text-xs font-normal text-muted-foreground">/5</span></p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">{t.week.avgEnergy}</p>
                   </div>
                 )}

@@ -116,7 +116,7 @@ export default function TodayPage() {
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
-  const [wizardData, setWizardData] = useState({ sleepHours: 7, energyLevel: 7, mood: "" });
+  const [wizardData, setWizardData] = useState({ sleepHours: 7, energyLevel: 3, mood: "" });
 
   const [suggestions, setSuggestions] = useState<SuggestionsData | null>(null);
   const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
@@ -128,7 +128,7 @@ export default function TodayPage() {
       markWizardShownToday();
       setWizardOpen(true);
       setWizardStep(1);
-      setWizardData({ sleepHours: 7, energyLevel: 7, mood: "" });
+      setWizardData({ sleepHours: 7, energyLevel: 3, mood: "" });
     }
   }, [ctxLoading, profileLoading, profile, todayCtx]);
 
@@ -261,7 +261,7 @@ export default function TodayPage() {
   const openWizardManually = (startStep: number) => {
     setWizardData({
       sleepHours: todayCtx?.sleepHours ?? 7,
-      energyLevel: todayCtx?.energyLevel ?? 7,
+      energyLevel: todayCtx?.energyLevel ?? 3,
       mood: todayCtx?.mood ?? "",
     });
     setWizardStep(startStep);
@@ -414,7 +414,7 @@ export default function TodayPage() {
           🌙 {todayCtx?.sleepHours ? `${todayCtx.sleepHours}h` : t.checkin.logSleep}
         </button>
         <button onClick={() => openWizardManually(2)} className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors flex-shrink-0", todayCtx?.energyLevel ? "bg-primary/10 border-primary/20 text-primary" : "bg-card border-border text-muted-foreground hover:border-primary/30")}>
-          ⚡ {todayCtx?.energyLevel ? `${t.checkin.logEnergy.replace("Log ", "").replace("Registrar ", "").replace("Registrar ", "")} ${todayCtx.energyLevel}/10` : t.checkin.logEnergy}
+          ⚡ {todayCtx?.energyLevel ? `${t.checkin.logEnergy.replace("Log ", "").replace("Registrar ", "").replace("Registrar ", "")} ${todayCtx.energyLevel}/5` : t.checkin.logEnergy}
         </button>
         <button onClick={() => openWizardManually(3)} className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors flex-shrink-0", todayCtx?.mood ? "bg-primary/10 border-primary/20 text-primary" : "bg-card border-border text-muted-foreground hover:border-primary/30")}>
           🌸 {todayCtx?.mood ? (t.moods[todayCtx.mood] ?? todayCtx.mood) : t.checkin.logMood}
@@ -591,7 +591,7 @@ export default function TodayPage() {
             {wizardStep === 2 && (
               <div className="mb-6">
                 <div className="grid grid-cols-5 gap-2 mb-3">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                  {[1, 2, 3, 4, 5].map((n) => (
                     <button key={n} onClick={() => setWizardData((p) => ({ ...p, energyLevel: n }))} className={cn("py-3.5 rounded-2xl text-sm font-semibold border-2 transition-all", wizardData.energyLevel === n ? "bg-primary text-primary-foreground border-primary scale-105 shadow-md" : "bg-accent border-transparent text-foreground hover:border-primary/30")}>
                       {n}
                     </button>
