@@ -16,27 +16,19 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Send, Moon, CheckCircle2, Circle, Plus, ChevronRight, X, ChevronDown } from "lucide-react";
+import { Send, Moon, CheckCircle2, Plus, ChevronRight, X, ListTodo } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/i18n/context";
 import { type IntentId } from "@/components/intent-legend";
-import { IntentSwimlane } from "@/components/intent-swimlane";
-import { RollingLine } from "@/components/rolling-line";
+import { IntentDock } from "@/components/intent-dock";
+import { StatusPill } from "@/components/status-pill";
+import { ListaSheet } from "@/components/lista-sheet";
 import { TypewriterText } from "@/components/typewriter-text";
 
 type ChatMessage = { role: "user" | "assistant"; content: string; streaming?: boolean };
 
 type TaskSuggestion = { title: string; category: string; priority: string; reason: string };
 type SuggestionsData = { message: string; suggestions: TaskSuggestion[] };
-
-const categoryColors: Record<string, string> = {
-  work: "bg-blue-100 text-blue-700",
-  home: "bg-amber-100 text-amber-700",
-  health: "bg-green-100 text-green-700",
-  kids: "bg-purple-100 text-purple-700",
-  "self-care": "bg-pink-100 text-pink-700",
-  food: "bg-orange-100 text-orange-700",
-};
 
 const MOOD_KEYS = ["happy", "calm", "tired", "anxious", "motivated", "overwhelmed", "grateful", "sad"] as const;
 
@@ -144,8 +136,7 @@ export default function TodayPage() {
   const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [addedSuggestions, setAddedSuggestions] = useState<Set<number>>(new Set());
-  const [moodExpanded, setMoodExpanded] = useState(false);
-  const [listOpen, setListOpen] = useState(true);
+  const [listOpen, setListOpen] = useState(false);
 
   useEffect(() => {
     if (!ctxLoading && !profileLoading && profile && !todayCtx && !hasWizardShownToday()) {
@@ -240,6 +231,10 @@ export default function TodayPage() {
       if (!res.ok) throw new Error("Failed");
       const data = await res.json() as SuggestionsData;
       setSuggestions(data);
+      // Surface in-thread — never a permanent panel under the chat
+      if (data.message?.trim()) {
+        setMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
+      }
     } catch {
       // silently fail
     } finally {
@@ -504,7 +499,9 @@ export default function TodayPage() {
 
   const completedCount = tasks.filter((tk) => tk.completed).length;
   const totalCount = tasks.length;
-  const showSuggestions = !suggestionsDismissed && (suggestionsLoading || suggestions !== null);
+  const showSuggestionCards =
+    !suggestionsDismissed && suggestions !== null && suggestions.suggestions.length > 0;
+  const pendingTasks = totalCount - completedCount;
 
   const wizardSteps = [
     { id: 1, emoji: "🌙", question: t.checkin.wizard.sleep.question, subtitle: t.checkin.wizard.sleep.subtitle },
@@ -515,406 +512,288 @@ export default function TodayPage() {
   const hour = new Date().getHours();
   const greetWord = hour < 12 ? t.greetings.morning : hour < 17 ? t.greetings.afternoon : t.greetings.evening;
 
-  const rollingPhrases =
-    lang === "es"
-      ? [
-          "Toca una idea abajo — yo arranco.",
-          "¿Cena, dinero, o solo que te escuchen?",
-          "Una cosa a la vez. Yo guardo el resto.",
-          cyclePhase?.phase && cyclePhase.phase !== "unknown"
-            ? `${t.phases[cyclePhase.phase]} · día ${cyclePhase.dayInCycle}`
-            : "Hoy cuenta. Estoy aquí.",
-        ]
-      : lang === "pt"
-        ? [
-            "Toque uma ideia abaixo — eu começo.",
-            "Jantar, dinheiro, ou só ser ouvida?",
-            "Uma coisa de cada vez. Eu guardo o resto.",
-            cyclePhase?.phase && cyclePhase.phase !== "unknown"
-              ? `${t.phases[cyclePhase.phase]} · dia ${cyclePhase.dayInCycle}`
-              : "Hoje importa. Estou aqui.",
-          ]
-        : [
-            "Tap an idea below — I’ll start.",
-            "Dinner, money, or just be heard?",
-            "One thing at a time. I’ll hold the rest.",
-            cyclePhase?.phase && cyclePhase.phase !== "unknown"
-              ? `${t.phases[cyclePhase.phase]} · day ${cyclePhase.dayInCycle}`
-              : "Today counts. I’m here.",
-          ];
-
   const moodLabel = todayCtx?.mood ? (t.moods[todayCtx.mood] ?? todayCtx.mood) : null;
+  const phaseLabel =
+    cyclePhase?.phase && cyclePhase.phase !== "unknown"
+      ? `${t.phases[cyclePhase.phase]} · ${cyclePhase.dayInCycle}`
+      : null;
+  const checkinLabel =
+    lang === "es" ? "Registrar" : lang === "pt" ? "Registrar" : "Check in";
+  const showPromptChips = messages.length <= 2 && !isStreaming;
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <header className="px-5 pt-9 pb-2">
-        <p className="mb-0.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-          {format(new Date(), "EEEE, MMMM do")}
-        </p>
-        <h1 className="font-serif text-[1.65rem] leading-snug text-foreground text-balance">
-          {profile ? `${greetWord}, ${profile.name}` : "Welcome"}
-        </h1>
-        <RollingLine
-          phrases={rollingPhrases}
-          onClick={() => {
-            const el = document.getElementById("luna-input");
-            el?.focus();
-          }}
-        />
-      </header>
-
-      {/* Compact check-in — mood collapses until tapped */}
-      <div className="mb-3 flex items-center gap-1.5 px-5">
-        <button
-          onClick={() => openWizardManually(1)}
-          className={cn(
-            "flex h-8 items-center gap-1 rounded-full border px-2.5 text-[11px] font-medium transition-colors",
-            todayCtx?.sleepHours
-              ? "border-primary/25 bg-primary/10 text-primary"
-              : "border-border bg-card text-muted-foreground",
-          )}
-        >
-          <span aria-hidden>🌙</span>
-          {todayCtx?.sleepHours ? `${todayCtx.sleepHours}h` : "—"}
-        </button>
-        <button
-          onClick={() => openWizardManually(2)}
-          className={cn(
-            "flex h-8 items-center gap-1 rounded-full border px-2.5 text-[11px] font-medium transition-colors",
-            clampEnergy(todayCtx?.energyLevel) != null
-              ? "border-primary/25 bg-primary/10 text-primary"
-              : "border-border bg-card text-muted-foreground",
-          )}
-        >
-          <span aria-hidden>⚡</span>
-          {clampEnergy(todayCtx?.energyLevel) != null
-            ? `${clampEnergy(todayCtx?.energyLevel)}/5`
-            : "—"}
-        </button>
-        <button
-          onClick={() => {
-            if (moodLabel) setMoodExpanded((v) => !v);
-            else openWizardManually(3);
-          }}
-          className={cn(
-            "flex h-8 min-w-0 max-w-[42%] items-center gap-1 rounded-full border px-2.5 text-[11px] font-medium transition-all",
-            moodLabel
-              ? "border-primary/25 bg-primary/10 text-primary"
-              : "border-border bg-card text-muted-foreground",
-          )}
-        >
-          <span aria-hidden>🌸</span>
-          <span className={cn("truncate", moodExpanded && "whitespace-normal")}>
-            {moodLabel ?? t.checkin.logMood}
-          </span>
-          {moodLabel && <ChevronDown className={cn("h-3 w-3 shrink-0 transition-transform", moodExpanded && "rotate-180")} />}
-        </button>
-      </div>
-      {moodExpanded && moodLabel && (
-        <button
-          type="button"
-          onClick={() => openWizardManually(3)}
-          className="mx-5 mb-3 rounded-2xl border border-border bg-card px-3 py-2 text-left text-xs leading-relaxed text-foreground animate-in fade-in slide-in-from-top-1 duration-200"
-        >
-          {moodLabel}
-          <span className="mt-1 block text-[10px] text-muted-foreground">
-            {lang === "es" ? "Toca para editar" : lang === "pt" ? "Toque para editar" : "Tap to edit"}
-          </span>
-        </button>
-      )}
-
-      {/* Chat */}
-      <div className="flex-1 flex flex-col overflow-hidden px-5">
-        <div
-          ref={chatListRef}
-          onScroll={onChatScroll}
-          className="flex-1 overflow-y-auto space-y-3 pb-3 hide-scrollbar"
-        >
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={cn(
-                "flex gap-2",
-                !msg.streaming && "animate-in fade-in slide-in-from-bottom-2 duration-300",
-                msg.role === "user" ? "flex-row-reverse" : "flex-row",
-              )}
-            >
-              {msg.role === "assistant" && (
-                <div className="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/15">
-                  <Moon className="h-4 w-4 text-primary" />
-                </div>
-              )}
-              <div
-                className={cn(
-                  "max-w-[82%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
-                  msg.role === "assistant"
-                    ? "rounded-tl-sm border border-border bg-card text-foreground"
-                    : "rounded-tr-sm bg-primary text-primary-foreground",
-                )}
-              >
-                {msg.role === "assistant" ? (
-                  msg.streaming ? (
-                    <>
-                      {msg.content}
-                      <span
-                        className="ml-0.5 inline-block h-[1.1em] w-[2px] translate-y-[2px] bg-primary align-middle animate-pulse"
-                        aria-hidden
-                      />
-                    </>
-                  ) : i === 0 && messages.length === 1 ? (
-                    <TypewriterText text={msg.content} />
-                  ) : (
-                    msg.content
-                  )
-                ) : (
-                  msg.content
-                )}
-              </div>
-            </div>
-          ))}
-          {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-                <Moon className="h-7 w-7 text-primary" />
-              </div>
-              <p className="mb-1 text-sm font-medium text-foreground">{t.chat.emptyTitle}</p>
-              <p className="text-xs text-muted-foreground">{t.chat.emptySubtitle}</p>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-[42rem] flex-col">
+      <header className="flex shrink-0 items-center justify-between gap-3 px-4 pb-2 pt-3 md:px-5 md:pt-4">
+        <div className="min-w-0">
+          <h1 className="truncate text-[1.05rem] font-semibold tracking-tight text-foreground">
+            {profile ? `${greetWord}, ${profile.name}` : "Luna"}
+          </h1>
+          <p className="text-[11px] text-muted-foreground">{format(new Date(), "EEEE, MMM d")}</p>
         </div>
-
-        <div className="border-t border-border/80 pb-2 pt-2">
-          <IntentSwimlane
-            activeIntent={activeIntent}
-            onPick={(intentId, fullPrompt) => {
-              setActiveIntent(intentId);
-              setInput(fullPrompt);
-            }}
+        <div className="flex shrink-0 items-center gap-1.5">
+          <StatusPill
+            sleepHours={todayCtx?.sleepHours}
+            energyLevel={clampEnergy(todayCtx?.energyLevel)}
+            moodLabel={moodLabel}
+            phaseLabel={phaseLabel}
+            checkinLabel={checkinLabel}
+            onClick={() => openWizardManually(todayCtx ? 1 : 1)}
           />
-          <div className="flex items-end gap-2 rounded-2xl border border-border bg-card px-3 py-2 transition-colors focus-within:border-primary/50">
-            <textarea
-              id="luna-input"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={t.chat.placeholder}
-              className="min-h-[20px] max-h-24 flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              rows={1}
-            />
-            <button
-              onClick={sendMessage}
-              disabled={!input.trim() || isStreaming}
-              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
-            >
-              <Send className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Luna Suggestions */}
-      {showSuggestions && (
-        <div className="px-5 pb-3">
-          <div className="bg-gradient-to-br from-primary/8 to-primary/4 border border-primary/20 rounded-2xl p-4">
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
-                  <Moon className="w-3.5 h-3.5 text-primary" />
-                </div>
-                <span className="text-xs font-semibold text-primary">{t.luna.suggests}</span>
-              </div>
-              <button onClick={() => setSuggestionsDismissed(true)} className="text-muted-foreground hover:text-foreground transition-colors">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            {suggestionsLoading ? (
-              <div className="flex items-center gap-2 py-2">
-                <div className="flex gap-1">
-                  {[0, 1, 2].map((i) => <div key={i} className="w-1.5 h-1.5 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />)}
-                </div>
-                <span className="text-xs text-muted-foreground">{t.luna.thinking}</span>
-              </div>
-            ) : suggestions ? (
-              <>
-                <p className="text-xs text-foreground/70 mb-3 leading-relaxed">{suggestions.message}</p>
-                <div className="space-y-2">
-                  {suggestions.suggestions.map((s, i) => (
-                    <div key={i} className={cn("flex items-center gap-3 py-2 px-3 rounded-xl transition-all", addedSuggestions.has(i) ? "bg-primary/10 opacity-60" : "bg-card/80 hover:bg-card")}>
-                      <div className="flex-1 min-w-0">
-                        <p className={cn("text-sm font-medium truncate", addedSuggestions.has(i) && "line-through text-muted-foreground")}>{s.title}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">{s.reason}</p>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium", categoryColors[s.category] || "bg-muted text-muted-foreground")}>{s.category}</span>
-                        <button onClick={() => addSuggestedTask(s, i)} disabled={addedSuggestions.has(i)} className={cn("w-6 h-6 rounded-full flex items-center justify-center transition-all flex-shrink-0", addedSuggestions.has(i) ? "bg-primary/20 text-primary" : "bg-primary text-primary-foreground hover:scale-110 active:scale-95")}>
-                          {addedSuggestions.has(i) ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : null}
-          </div>
-        </div>
-      )}
-
-      {/* Capture list — tasks, groceries, errands — same inbox */}
-      <div className="border-t border-border bg-card/40 px-5 py-3">
-        <div className="mb-2 flex items-center justify-between">
           <button
             type="button"
-            onClick={() => setListOpen((v) => !v)}
-            className="flex items-center gap-2 text-left"
+            onClick={() => setListOpen(true)}
+            className="relative flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+            aria-label={lang === "es" ? "Lista" : "List"}
           >
-            <h2 className="font-serif text-base text-foreground">
-              {lang === "es" ? "Lista de hoy" : lang === "pt" ? "Lista de hoje" : "Today’s list"}
-            </h2>
-            {totalCount > 0 && (
-              <span className="text-xs text-muted-foreground">
-                {completedCount}/{totalCount}
+            <ListTodo className="h-4 w-4" />
+            {pendingTasks > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold text-primary-foreground">
+                {pendingTasks}
               </span>
             )}
-            <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", listOpen && "rotate-180")} />
-          </button>
-          <button
-            onClick={() => {
-              setListOpen(true);
-              setAddingTask(true);
-            }}
-            className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors hover:bg-primary/20"
-            aria-label={t.tasks.add}
-          >
-            <Plus className="h-4 w-4" />
           </button>
         </div>
-        {listOpen && (
-          <div className="animate-in fade-in duration-200">
-            <div className="mb-2 flex gap-1.5 overflow-x-auto hide-scrollbar pb-1">
-              {(["home", "food", "kids", "work"] as const).map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => {
-                    setAddingTask(true);
-                    setNewTaskTitle("");
-                    // stash category via title prefix convention — create uses home by default; set via quick add below
-                    (window as unknown as { __lunaQuickCat?: string }).__lunaQuickCat = cat;
-                  }}
-                  className={cn(
-                    "flex-shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold",
-                    categoryColors[cat] || "bg-muted text-muted-foreground",
-                  )}
-                >
-                  + {cat === "food" ? (lang === "es" ? "súper" : "grocery") : cat}
-                </button>
-              ))}
-            </div>
-            {tasks.length === 0 && !addingTask && (
-              <p className="py-2 text-center text-xs text-muted-foreground">{t.tasks.noTasks}</p>
+      </header>
+
+      {/* Thread — sole message scroll */}
+      <div
+        ref={chatListRef}
+        onScroll={onChatScroll}
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-3 hide-scrollbar md:px-5"
+      >
+        {messages.map((msg, i) => (
+          <div
+            key={i}
+            className={cn(
+              "flex gap-2",
+              !msg.streaming && "animate-in fade-in slide-in-from-bottom-2 duration-200",
+              msg.role === "user" ? "flex-row-reverse" : "flex-row",
             )}
-            <div className="max-h-40 space-y-1 overflow-y-auto hide-scrollbar">
-              {tasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="flex items-center gap-2.5 rounded-xl px-1 py-1.5 transition-colors hover:bg-accent/50"
-                >
-                  <button
-                    onClick={() => toggleTask(task.id, task.completed)}
-                    className="flex-shrink-0 text-muted-foreground transition-colors hover:text-primary"
-                  >
-                    {task.completed ? (
-                      <CheckCircle2 className="h-5 w-5 text-primary" />
-                    ) : (
-                      <Circle className="h-5 w-5" />
-                    )}
-                  </button>
-                  <span
-                    className={cn(
-                      "flex-1 text-sm",
-                      task.completed ? "text-muted-foreground line-through" : "text-foreground",
-                    )}
-                  >
-                    {task.title}
-                  </span>
-                  <span
-                    className={cn(
-                      "rounded-full px-2 py-0.5 text-[10px] font-medium",
-                      categoryColors[task.category] || "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    {task.category}
-                  </span>
-                </div>
-              ))}
-              {addingTask && (
-                <div className="flex items-center gap-2 py-1">
-                  <Circle className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-                  <input
-                    autoFocus
-                    value={newTaskTitle}
-                    onChange={(e) => setNewTaskTitle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") addTask();
-                      if (e.key === "Escape") {
-                        setAddingTask(false);
-                        setNewTaskTitle("");
-                      }
-                    }}
-                    placeholder={
-                      lang === "es"
-                        ? "Tarea, súper, recado…"
-                        : lang === "pt"
-                          ? "Tarefa, mercado, recado…"
-                          : "Task, grocery, errand…"
-                    }
-                    className="flex-1 border-b border-primary/30 bg-transparent pb-1 text-sm outline-none placeholder:text-muted-foreground"
-                  />
-                  <button onClick={addTask} className="text-xs font-medium text-primary">
-                    {t.tasks.add}
-                  </button>
-                </div>
+          >
+            {msg.role === "assistant" && (
+              <div className="mt-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-primary/15">
+                <Moon className="h-3.5 w-3.5 text-primary" />
+              </div>
+            )}
+            <div
+              className={cn(
+                "max-w-[min(85%,36rem)] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
+                msg.role === "assistant"
+                  ? "rounded-tl-sm border border-border bg-card text-foreground"
+                  : "rounded-tr-sm bg-primary text-primary-foreground",
+              )}
+            >
+              {msg.role === "assistant" ? (
+                msg.streaming ? (
+                  <>
+                    {msg.content}
+                    <span
+                      className="ml-0.5 inline-block h-[1.1em] w-[2px] translate-y-[2px] bg-primary align-middle animate-pulse"
+                      aria-hidden
+                    />
+                  </>
+                ) : i === 0 && messages.length === 1 ? (
+                  <TypewriterText text={msg.content} />
+                ) : (
+                  msg.content
+                )
+              ) : (
+                msg.content
               )}
             </div>
           </div>
+        ))}
+
+        {suggestionsLoading && (
+          <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
+            <div className="flex gap-1">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="h-1.5 w-1.5 rounded-full bg-primary/50 animate-bounce"
+                  style={{ animationDelay: `${i * 0.15}s` }}
+                />
+              ))}
+            </div>
+            {t.luna.thinking}
+          </div>
         )}
+
+        {showSuggestionCards && (
+          <div className="ml-9 space-y-1.5 rounded-2xl border border-border bg-card p-3 animate-in fade-in duration-200">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-[11px] font-medium text-muted-foreground">{t.luna.suggests}</span>
+              <button
+                type="button"
+                onClick={() => setSuggestionsDismissed(true)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {suggestions!.suggestions.map((s, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl px-2 py-1.5",
+                  addedSuggestions.has(i) && "opacity-50",
+                )}
+              >
+                <div className="min-w-0 flex-1">
+                  <p
+                    className={cn(
+                      "truncate text-sm font-medium",
+                      addedSuggestions.has(i) && "line-through text-muted-foreground",
+                    )}
+                  >
+                    {s.title}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => addSuggestedTask(s, i)}
+                  disabled={addedSuggestions.has(i)}
+                  className={cn(
+                    "flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full transition-colors",
+                    addedSuggestions.has(i)
+                      ? "bg-primary/15 text-primary"
+                      : "bg-primary text-primary-foreground",
+                  )}
+                >
+                  {addedSuggestions.has(i) ? (
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <Plus className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
       </div>
 
-      {/* Wizard */}
+      {/* Composer dock */}
+      <div className="shrink-0 border-t border-border/80 bg-background/95 px-4 pb-2 pt-2 backdrop-blur-sm md:px-5">
+        <IntentDock
+          activeIntent={activeIntent}
+          showSuggestions={showPromptChips}
+          onPickMode={(intentId, draftStem) => {
+            setActiveIntent(intentId);
+            setInput(draftStem);
+            document.getElementById("luna-input")?.focus();
+          }}
+          onPickSuggestion={(intentId, fullPrompt) => {
+            setActiveIntent(intentId);
+            setInput(fullPrompt);
+            document.getElementById("luna-input")?.focus();
+          }}
+        />
+        <div className="flex items-end gap-2 rounded-2xl border border-border bg-card px-3 py-2 transition-colors focus-within:border-primary/50">
+          <textarea
+            id="luna-input"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={t.chat.placeholder}
+            className="max-h-24 min-h-[20px] flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            rows={1}
+          />
+          <button
+            type="button"
+            onClick={sendMessage}
+            disabled={!input.trim() || isStreaming}
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <ListaSheet
+        open={listOpen}
+        onClose={() => {
+          setListOpen(false);
+          setAddingTask(false);
+        }}
+        tasks={tasks}
+        completedCount={completedCount}
+        totalCount={totalCount}
+        addingTask={addingTask}
+        setAddingTask={setAddingTask}
+        newTaskTitle={newTaskTitle}
+        setNewTaskTitle={setNewTaskTitle}
+        onToggle={toggleTask}
+        onAdd={addTask}
+        onPickCategory={(cat) => {
+          setAddingTask(true);
+          setNewTaskTitle("");
+          (window as unknown as { __lunaQuickCat?: string }).__lunaQuickCat = cat;
+        }}
+        noTasksLabel={t.tasks.noTasks}
+        addLabel={t.tasks.add}
+      />
+
       {wizardOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center">
+        <div className="fixed inset-0 z-[70] flex items-end justify-center md:items-center">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-          <div className="relative bg-card w-full max-w-md rounded-t-3xl px-6 pt-6 pb-10 animate-in slide-in-from-bottom-4 duration-300">
-            <div className="flex items-center justify-between mb-6">
+          <div className="relative w-full max-w-md rounded-t-3xl bg-card px-6 pb-10 pt-6 animate-in slide-in-from-bottom-4 duration-200 md:rounded-3xl">
+            <div className="mb-6 flex items-center justify-between">
               <div className="flex gap-1.5">
                 {wizardSteps.map((s) => (
-                  <div key={s.id} className={cn("h-1.5 rounded-full transition-all duration-300", s.id === wizardStep ? "w-6 bg-primary" : s.id < wizardStep ? "w-3 bg-primary/40" : "w-3 bg-muted")} />
+                  <div
+                    key={s.id}
+                    className={cn(
+                      "h-1.5 rounded-full transition-all duration-200",
+                      s.id === wizardStep
+                        ? "w-6 bg-primary"
+                        : s.id < wizardStep
+                          ? "w-3 bg-primary/40"
+                          : "w-3 bg-muted",
+                    )}
+                  />
                 ))}
               </div>
-              <button onClick={() => { markWizardShownToday(); setWizardOpen(false); }} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
-                <X className="w-4 h-4" />
+              <button
+                type="button"
+                onClick={() => {
+                  markWizardShownToday();
+                  setWizardOpen(false);
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center">
-                <Moon className="w-3.5 h-3.5 text-primary" />
+            <div className="mb-4 flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15">
+                <Moon className="h-3.5 w-3.5 text-primary" />
               </div>
               <span className="text-xs text-muted-foreground">{t.luna.morningCheckin}</span>
             </div>
 
             <div className="mb-6">
-              <div className="text-3xl mb-2">{currentWizardStep.emoji}</div>
-              <h3 className="text-2xl font-serif leading-tight">{currentWizardStep.question}</h3>
-              <p className="text-sm text-muted-foreground mt-1">{currentWizardStep.subtitle}</p>
+              <div className="mb-2 text-3xl">{currentWizardStep.emoji}</div>
+              <h3 className="text-xl font-semibold leading-tight">{currentWizardStep.question}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{currentWizardStep.subtitle}</p>
             </div>
 
             {wizardStep === 1 && (
-              <div className="grid grid-cols-6 gap-2 mb-6">
+              <div className="mb-6 grid grid-cols-6 gap-2">
                 {[4, 5, 6, 7, 8, 9].map((h) => (
-                  <button key={h} onClick={() => setWizardData((p) => ({ ...p, sleepHours: h }))} className={cn("py-4 rounded-2xl text-sm font-semibold border-2 transition-all flex flex-col items-center gap-0.5", wizardData.sleepHours === h ? "bg-primary text-primary-foreground border-primary scale-105 shadow-md" : "bg-accent border-transparent text-foreground hover:border-primary/30")}>
+                  <button
+                    key={h}
+                    type="button"
+                    onClick={() => setWizardData((p) => ({ ...p, sleepHours: h }))}
+                    className={cn(
+                      "flex flex-col items-center gap-0.5 rounded-2xl border-2 py-4 text-sm font-semibold transition-all",
+                      wizardData.sleepHours === h
+                        ? "scale-105 border-primary bg-primary text-primary-foreground shadow-md"
+                        : "border-transparent bg-accent text-foreground hover:border-primary/30",
+                    )}
+                  >
                     <span className="text-base">{h}</span>
                     <span className="text-[10px] font-normal opacity-70">hrs</span>
                   </button>
@@ -924,14 +803,24 @@ export default function TodayPage() {
 
             {wizardStep === 2 && (
               <div className="mb-6">
-                <div className="grid grid-cols-5 gap-2 mb-3">
+                <div className="mb-3 grid grid-cols-5 gap-2">
                   {[1, 2, 3, 4, 5].map((n) => (
-                    <button key={n} onClick={() => setWizardData((p) => ({ ...p, energyLevel: n }))} className={cn("py-3.5 rounded-2xl text-sm font-semibold border-2 transition-all", wizardData.energyLevel === n ? "bg-primary text-primary-foreground border-primary scale-105 shadow-md" : "bg-accent border-transparent text-foreground hover:border-primary/30")}>
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setWizardData((p) => ({ ...p, energyLevel: n }))}
+                      className={cn(
+                        "rounded-2xl border-2 py-3.5 text-sm font-semibold transition-all",
+                        wizardData.energyLevel === n
+                          ? "scale-105 border-primary bg-primary text-primary-foreground shadow-md"
+                          : "border-transparent bg-accent text-foreground hover:border-primary/30",
+                      )}
+                    >
                       {n}
                     </button>
                   ))}
                 </div>
-                <div className="flex justify-between text-xs text-muted-foreground px-1">
+                <div className="flex justify-between px-1 text-xs text-muted-foreground">
                   <span>{t.checkin.wizard.exhausted}</span>
                   <span>{t.checkin.wizard.fullPower}</span>
                 </div>
@@ -940,9 +829,19 @@ export default function TodayPage() {
 
             {wizardStep === 3 && (
               <div className="mb-6">
-                <div className="flex flex-wrap gap-2 mb-4">
+                <div className="mb-4 flex flex-wrap gap-2">
                   {MOOD_KEYS.map((m) => (
-                    <button key={m} onClick={() => setWizardData((p) => ({ ...p, mood: p.mood === m ? "" : m }))} className={cn("px-4 py-2.5 rounded-full text-sm font-medium border-2 transition-all capitalize", wizardData.mood === m ? "bg-primary text-primary-foreground border-primary" : "bg-accent border-transparent text-foreground hover:border-primary/30")}>
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setWizardData((p) => ({ ...p, mood: p.mood === m ? "" : m }))}
+                      className={cn(
+                        "rounded-full border-2 px-4 py-2.5 text-sm font-medium capitalize transition-all",
+                        wizardData.mood === m
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-transparent bg-accent text-foreground hover:border-primary/30",
+                      )}
+                    >
                       {t.moods[m]}
                     </button>
                   ))}
@@ -951,16 +850,36 @@ export default function TodayPage() {
                   value={MOOD_KEYS.includes(wizardData.mood as (typeof MOOD_KEYS)[number]) ? "" : wizardData.mood}
                   onChange={(e) => setWizardData((p) => ({ ...p, mood: e.target.value }))}
                   placeholder={t.checkin.wizard.moodPlaceholder}
-                  className="w-full px-4 py-3 rounded-2xl bg-accent border-2 border-transparent text-sm outline-none focus:border-primary/40 placeholder:text-muted-foreground"
+                  className="w-full rounded-2xl border-2 border-transparent bg-accent px-4 py-3 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/40"
                 />
               </div>
             )}
 
-            <button onClick={handleWizardNext} disabled={createDailyContext.isPending} className="w-full py-4 rounded-2xl bg-primary text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60 transition-all active:scale-[0.98]">
-              {wizardStep < 3 ? <>{t.checkin.wizard.continue} <ChevronRight className="w-4 h-4" /></> : createDailyContext.isPending ? t.checkin.wizard.saving : t.checkin.wizard.startDay}
+            <button
+              type="button"
+              onClick={handleWizardNext}
+              disabled={createDailyContext.isPending}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-sm font-semibold text-primary-foreground transition-all active:scale-[0.98] disabled:opacity-60"
+            >
+              {wizardStep < 3 ? (
+                <>
+                  {t.checkin.wizard.continue} <ChevronRight className="h-4 w-4" />
+                </>
+              ) : createDailyContext.isPending ? (
+                t.checkin.wizard.saving
+              ) : (
+                t.checkin.wizard.startDay
+              )}
             </button>
 
-            <button onClick={() => { markWizardShownToday(); setWizardOpen(false); }} className="w-full text-center text-xs text-muted-foreground mt-3 py-1 hover:text-foreground transition-colors">
+            <button
+              type="button"
+              onClick={() => {
+                markWizardShownToday();
+                setWizardOpen(false);
+              }}
+              className="mt-3 w-full py-1 text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
               {t.checkin.wizard.skip}
             </button>
           </div>

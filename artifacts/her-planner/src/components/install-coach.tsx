@@ -93,7 +93,7 @@ export function InstallCoach() {
     <div
       role="dialog"
       aria-label={copy.title}
-      className="fixed inset-x-3 bottom-20 z-50 mx-auto max-w-md rounded-2xl border border-border bg-background/95 p-4 shadow-lg backdrop-blur animate-in slide-in-from-bottom-3 duration-300"
+      className="fixed inset-x-3 bottom-20 z-50 mx-auto max-w-[42rem] rounded-2xl border border-border bg-background/95 p-4 shadow-lg backdrop-blur animate-in slide-in-from-bottom-3 duration-300 md:bottom-6"
     >
       <p className="text-sm font-semibold text-foreground">{copy.title}</p>
       <p className="mt-1.5 text-sm text-muted-foreground">

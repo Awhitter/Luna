@@ -33,12 +33,24 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/settings", label: t.nav.profile, icon: Settings, match: (p: string) => p === "/settings" },
   ];
 
-  return (
-    <div className="min-h-[100dvh] flex flex-col bg-background max-w-md mx-auto relative shadow-2xl overflow-hidden">
-      <main className="flex-1 overflow-y-auto pb-24">{children}</main>
+  const isToday = location === "/";
 
-      <nav className="fixed bottom-0 left-0 right-0 z-50 mx-auto max-w-md border-t border-border/80 bg-card/90 pb-safe backdrop-blur-xl">
-        <div className="flex items-center justify-around px-2 py-1.5">
+  return (
+    <div className="relative flex min-h-[100dvh] flex-col bg-background">
+      {/* Soft full-bleed atmosphere — not a phone stub */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_hsla(345,42%,52%,0.07),_transparent_55%)]"
+      />
+
+      <nav
+        className={cn(
+          "fixed inset-x-0 z-50 border-border/80 bg-card/90 backdrop-blur-xl",
+          "bottom-0 border-t pb-safe",
+          "md:bottom-auto md:top-0 md:border-b md:border-t-0 md:pb-0",
+        )}
+      >
+        <div className="mx-auto flex max-w-[42rem] items-center justify-around px-2 py-1.5 md:justify-start md:gap-1 md:px-4 md:py-2">
           {navItems.map((item) => {
             const isActive = item.match(location);
             const Icon = item.icon;
@@ -47,22 +59,35 @@ export function Layout({ children }: { children: ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex w-[4.5rem] flex-col items-center justify-center rounded-2xl py-2 transition-all duration-200 ease-out",
+                  "flex flex-col items-center justify-center rounded-2xl py-2 transition-all duration-200 ease-out md:flex-row md:gap-2 md:px-3 md:py-2",
+                  "w-[4.5rem] md:w-auto",
                   isActive
                     ? "bg-primary/12 text-primary"
                     : "text-muted-foreground hover:bg-accent/70 hover:text-foreground",
                 )}
               >
                 <Icon
-                  className={cn("mb-0.5 h-5 w-5 transition-transform duration-200", isActive && "scale-110")}
+                  className={cn("mb-0.5 h-5 w-5 transition-transform duration-200 md:mb-0", isActive && "scale-110")}
                   strokeWidth={isActive ? 2.4 : 1.9}
                 />
-                <span className="text-[10px] font-medium tracking-tight">{item.label}</span>
+                <span className="text-[10px] font-medium tracking-tight md:text-xs">{item.label}</span>
               </Link>
             );
           })}
         </div>
       </nav>
+
+      {/* Today: shell locked, thread scrolls. Other pages: main scrolls. */}
+      <main
+        className={cn(
+          "relative z-[1] flex min-h-0 flex-1 flex-col",
+          isToday ? "overflow-hidden" : "overflow-y-auto",
+          "pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))]",
+          "md:pb-0 md:pt-14",
+        )}
+      >
+        {isToday ? children : <div className="mx-auto w-full max-w-[42rem]">{children}</div>}
+      </main>
     </div>
   );
 }
