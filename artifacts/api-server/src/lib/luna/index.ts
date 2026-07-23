@@ -1,4 +1,5 @@
 import { createOpenAI } from "@ai-sdk/openai";
+import { createXai } from "@ai-sdk/xai";
 import type { LanguageModel } from "ai";
 
 function resolveOpenAIApiKey(): string {
@@ -30,24 +31,40 @@ function resolveOpenAIBaseURL(): string | undefined {
   );
 }
 
-let cachedProvider: ReturnType<typeof createOpenAI> | null = null;
+let cachedOpenAI: ReturnType<typeof createOpenAI> | null = null;
+let cachedXai: ReturnType<typeof createXai> | null = null;
 
 function getOpenAIProvider() {
-  if (!cachedProvider) {
+  if (!cachedOpenAI) {
     const apiKey = resolveOpenAIApiKey();
     const baseURL = resolveOpenAIBaseURL();
-    cachedProvider = createOpenAI({
+    cachedOpenAI = createOpenAI({
       apiKey,
       ...(baseURL ? { baseURL } : {}),
     });
   }
-  return cachedProvider;
+  return cachedOpenAI;
+}
+
+function getXaiProvider() {
+  const apiKey = process.env.XAI_API_KEY;
+  if (!apiKey) return null;
+  if (!cachedXai) {
+    cachedXai = createXai({ apiKey });
+  }
+  return cachedXai;
 }
 
 /**
- * The single place to swap providers. Later: xai.chat("grok-4.5") when XAI_API_KEY is set.
+ * Prefer Grok 4.5 when XAI_API_KEY is set (custom tools via chat API).
+ * Otherwise OpenAI gpt-4o (or agent-config model name).
  */
 export function getModel(name?: string): LanguageModel {
+  const xai = getXaiProvider();
+  if (xai) {
+    // Agent-config may still say gpt-4o; when XAI is configured we use Grok as chat core.
+    return xai.chat("grok-4.5");
+  }
   return getOpenAIProvider()(name ?? "gpt-4o");
 }
 
@@ -72,3 +89,10 @@ export {
   SUMMARIZE_THRESHOLD,
 } from "./memory";
 export { buildLunaTools, type LunaTools, type ToolContext } from "./tools";
+export {
+  INTENTS,
+  getIntent,
+  toolsForIntent,
+  type IntentId,
+  type IntentDefinition,
+} from "./intents";
