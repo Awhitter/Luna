@@ -4,10 +4,10 @@
   "outputDirectory": "artifacts/her-planner/dist/public",
   "functions": {
     "api/index.mjs": {
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "api/[...path].mjs": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   },
   "routes": [

@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout";
+import { InstallCoach } from "@/components/install-coach";
 import { LanguageProvider } from "@/i18n/context";
 
 import TodayPage from "@/pages/today";
@@ -38,6 +39,7 @@ function App() {
             <Router />
           </WouterRouter>
           <Toaster />
+          <InstallCoach />
         </TooltipProvider>
       </QueryClientProvider>
     </LanguageProvider>
