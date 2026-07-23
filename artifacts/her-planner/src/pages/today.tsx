@@ -543,7 +543,7 @@ export default function TodayPage() {
   const showPromptChips = !hasUserMessage && !isStreaming && messages.length <= 2;
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col">
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col">
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-card/80 px-4 pb-3 pt-3.5 backdrop-blur-sm md:px-5">
         <div className="min-w-0">
           <h1 className="truncate font-sans text-[1.15rem] font-semibold tracking-tight text-foreground">

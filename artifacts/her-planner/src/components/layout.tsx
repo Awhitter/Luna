@@ -95,9 +95,10 @@ export function Layout({ children }: { children: ReactNode }) {
         {/* Framed stage — clear boundary on every viewport */}
         <div
           className={cn(
-            "luna-stage mx-auto flex min-h-0 w-full max-w-[44rem] flex-1 flex-col",
-            "border-x border-border/80 bg-card shadow-[0_0_0_1px_hsla(345,30%,40%,0.04),0_20px_50px_-24px_hsla(345,40%,20%,0.28)]",
-            "md:my-0 md:max-h-[calc(100dvh-5.5rem)] md:rounded-3xl md:border",
+            "luna-stage mx-auto flex w-full max-w-[44rem] flex-1 flex-col",
+            "min-h-0 h-full",
+            "border-x border-border/80 bg-card shadow-[0_0_0_1px_hsla(345,30%,40%,0.06),0_24px_60px_-20px_hsla(345,40%,20%,0.35)]",
+            "md:h-[calc(100dvh-5.5rem)] md:max-h-[calc(100dvh-5.5rem)] md:rounded-3xl md:border",
             !isToday && "overflow-y-auto",
             isToday && "overflow-hidden",
           )}
