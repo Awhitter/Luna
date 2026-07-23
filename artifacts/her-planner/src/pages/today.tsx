@@ -525,7 +525,7 @@ export default function TodayPage() {
     <div className="mx-auto flex h-full min-h-0 w-full max-w-[42rem] flex-col">
       <header className="flex shrink-0 items-center justify-between gap-3 px-4 pb-2 pt-3 md:px-5 md:pt-4">
         <div className="min-w-0">
-          <h1 className="truncate text-[1.05rem] font-semibold tracking-tight text-foreground">
+          <h1 className="truncate font-sans text-[1.05rem] font-semibold tracking-tight text-foreground">
             {profile ? `${greetWord}, ${profile.name}` : "Luna"}
           </h1>
           <p className="text-[11px] text-muted-foreground">{format(new Date(), "EEEE, MMM d")}</p>
