@@ -96,7 +96,7 @@ export default function TodayPage() {
   const queryClient = useQueryClient();
   const { t, lang } = useLanguage();
 
-  const { data: profile, isLoading: profileLoading } = useGetProfile();
+  const { data: profile, isLoading: profileLoading, isError: profileError } = useGetProfile();
   const { data: todayCtx, isLoading: ctxLoading } = useGetTodayContext();
   const { data: cyclePhase } = useGetCurrentCyclePhase();
   const { data: tasks = [] } = useListTasks({ view: "today" });
@@ -135,8 +135,9 @@ export default function TodayPage() {
   }, [ctxLoading, profileLoading, profile, todayCtx]);
 
   useEffect(() => {
-    if (!profileLoading && !profile) setLocation("/settings");
-  }, [profile, profileLoading, setLocation]);
+    // 404 (no profile) or hard API failure → settings / onboarding, never infinite spin
+    if (!profileLoading && (!profile || profileError)) setLocation("/settings");
+  }, [profile, profileLoading, profileError, setLocation]);
 
   useEffect(() => {
     const draft = localStorage.getItem("luna-pending-draft");
