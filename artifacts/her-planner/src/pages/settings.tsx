@@ -36,7 +36,7 @@ type ProfileFormData = z.infer<typeof profileSchema>;
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
-  const { data: profile, isLoading } = useGetProfile();
+  const { data: profile, isLoading, isError: profileError } = useGetProfile();
   const createProfile = useCreateProfile();
   const updateProfile = useUpdateProfile();
   const { t, lang, setLang } = useLanguage();
@@ -86,9 +86,9 @@ export default function SettingsPage() {
   };
 
   const hasKids = form.watch("hasKids");
-  const isOnboarding = !profile && !isLoading;
+  const isOnboarding = !profile && (!isLoading || profileError);
 
-  if (isLoading) {
+  if (isLoading && !profileError) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
