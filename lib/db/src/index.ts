@@ -13,4 +13,20 @@ if (!process.env.DATABASE_URL) {
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle(pool, { schema });
 
+// Ensure required Postgres extensions exist. Safe to run repeatedly — it's a
+// no-op if already enabled. Required for pgvector-backed agent_memories.
+let extensionsReadyPromise: Promise<void> | null = null;
+export function ensureExtensions(): Promise<void> {
+  if (!extensionsReadyPromise) {
+    extensionsReadyPromise = pool
+      .query("CREATE EXTENSION IF NOT EXISTS vector")
+      .then(() => undefined)
+      .catch((err) => {
+        extensionsReadyPromise = null;
+        throw err;
+      });
+  }
+  return extensionsReadyPromise;
+}
+
 export * from "./schema";

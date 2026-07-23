@@ -5,6 +5,7 @@ import tasksRouter from "./tasks";
 import cycleRouter from "./cycle";
 import dailyContextRouter from "./daily-context";
 import openaiRouter from "./openai";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(tasksRouter);
 router.use(cycleRouter);
 router.use(dailyContextRouter);
 router.use(openaiRouter);
+router.use(adminRouter);
 
 export default router;

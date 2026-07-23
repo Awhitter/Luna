@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/admin/"
+title = "Her Planner Admin"
+version = "1.0.0"
+id = "artifacts/her-planner-admin"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/admin/" ]
+localPort = 23047
+
+[services.development]
+run = "pnpm --filter @workspace/her-planner-admin run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/her-planner-admin", "run", "build" ]
+publicDir = "artifacts/her-planner-admin/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23047"
+BASE_PATH = "/admin/"
