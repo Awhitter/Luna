@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./agentConfig";
+export * from "./agentMemory";
 export * from "./apiError";
 export * from "./checkinStreak";
 export * from "./createCycleEntryBody";
@@ -22,6 +24,7 @@ export * from "./cyclePhase";
 export * from "./cyclePhasePhase";
 export * from "./dailyContext";
 export * from "./healthStatus";
+export * from "./listAgentMemoriesParams";
 export * from "./listCycleEntriesParams";
 export * from "./listDailyContextsParams";
 export * from "./listTasksParams";
@@ -40,6 +43,7 @@ export * from "./tasksSummaryMonth";
 export * from "./tasksSummaryToday";
 export * from "./tasksSummaryWeek";
 export * from "./taskView";
+export * from "./updateAgentConfigBody";
 export * from "./updateProfileBody";
 export * from "./updateTaskBody";
 export * from "./updateTaskBodyPriority";

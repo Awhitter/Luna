@@ -1,0 +1,120 @@
+import { useEffect, useState } from "react";
+import { useLanguage } from "@/i18n/context";
+
+const DISMISS_KEY = "luna-install-coach-dismissed";
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+
+function isStandalone(): boolean {
+  if (typeof window === "undefined") return false;
+  const nav = window.navigator as Navigator & { standalone?: boolean };
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    nav.standalone === true
+  );
+}
+
+function isIos(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
+const COPY = {
+  es: {
+    title: "Lleva Luna en tu pantalla de inicio",
+    bodyIos: "En Safari: toca Compartir → Añadir a pantalla de inicio. Sin App Store.",
+    bodyOther: "Instálala como app — un toque y Luna vive en tu pantalla.",
+    dismiss: "Ahora no",
+    gotIt: "Entendido",
+    install: "Instalar",
+  },
+  en: {
+    title: "Add Luna to your home screen",
+    bodyIos: "In Safari: tap Share → Add to Home Screen. No App Store needed.",
+    bodyOther: "Install as an app — one tap and Luna lives on your home screen.",
+    dismiss: "Not now",
+    gotIt: "Got it",
+    install: "Install",
+  },
+  pt: {
+    title: "Coloque a Luna na tela inicial",
+    bodyIos: "No Safari: toque em Compartilhar → Adicionar à Tela de Início. Sem App Store.",
+    bodyOther: "Instale como app — um toque e a Luna fica na tela inicial.",
+    dismiss: "Agora não",
+    gotIt: "Entendi",
+    install: "Instalar",
+  },
+} as const;
+
+export function InstallCoach() {
+  const { lang } = useLanguage();
+  const [open, setOpen] = useState(false);
+  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
+  const copy = COPY[lang] ?? COPY.es;
+
+  useEffect(() => {
+    if (isStandalone()) return;
+    if (localStorage.getItem(DISMISS_KEY) === "1") return;
+
+    const onBip = (e: Event) => {
+      e.preventDefault();
+      setDeferred(e as BeforeInstallPromptEvent);
+    };
+    window.addEventListener("beforeinstallprompt", onBip);
+
+    const t = window.setTimeout(() => setOpen(true), 2200);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("beforeinstallprompt", onBip);
+    };
+  }, []);
+
+  if (!open) return null;
+
+  const dismiss = () => {
+    localStorage.setItem(DISMISS_KEY, "1");
+    setOpen(false);
+  };
+
+  const install = async () => {
+    if (deferred) {
+      await deferred.prompt();
+      await deferred.userChoice;
+      dismiss();
+      return;
+    }
+    dismiss();
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-label={copy.title}
+      className="fixed inset-x-3 bottom-20 z-50 mx-auto max-w-[42rem] rounded-2xl border border-border bg-background/95 p-4 shadow-lg backdrop-blur animate-in slide-in-from-bottom-3 duration-300 md:bottom-6"
+    >
+      <p className="text-sm font-semibold text-foreground">{copy.title}</p>
+      <p className="mt-1.5 text-sm text-muted-foreground">
+        {isIos() ? copy.bodyIos : copy.bodyOther}
+      </p>
+      <div className="mt-3 flex justify-end gap-2">
+        <button
+          type="button"
+          className="rounded-xl px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent"
+          onClick={dismiss}
+        >
+          {copy.dismiss}
+        </button>
+        <button
+          type="button"
+          className="rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+          onClick={install}
+        >
+          {deferred && !isIos() ? copy.install : copy.gotIt}
+        </button>
+      </div>
+    </div>
+  );
+}

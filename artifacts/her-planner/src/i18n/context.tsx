@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode } from "react";
 import { translations, type Lang, type Translations } from "./translations";
 
 type LanguageContextType = {
@@ -8,9 +8,9 @@ type LanguageContextType = {
 };
 
 const LanguageContext = createContext<LanguageContextType>({
-  lang: "en",
+  lang: "es",
   setLang: () => {},
-  t: translations.en,
+  t: translations.es,
 });
 
 const STORAGE_KEY = "luna-language";
@@ -19,9 +19,10 @@ function detectLanguage(): Lang {
   const stored = localStorage.getItem(STORAGE_KEY) as Lang | null;
   if (stored && stored in translations) return stored;
   const browser = navigator.language.toLowerCase();
-  if (browser.startsWith("es")) return "es";
   if (browser.startsWith("pt")) return "pt";
-  return "en";
+  if (browser.startsWith("en")) return "en";
+  // Spanish-first product: default es for es-* and unknown locales
+  return "es";
 }
 
 export function LanguageProvider({ children }: { children: ReactNode }) {

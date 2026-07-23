@@ -359,6 +359,74 @@ export const DeleteOpenaiConversationParams = zod.object({
 });
 
 /**
+ * @summary Get the active Luna agent configuration
+ */
+export const GetAgentConfigResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  persona: zod.string(),
+  rules: zod.string().nullish(),
+  model: zod.string(),
+  temperature: zod.number(),
+  maxTokens: zod.number(),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Update Luna's identity, system prompt, behavior rules, and model settings
+ */
+export const UpdateAgentConfigBody = zod.object({
+  name: zod.string().optional(),
+  persona: zod.string().optional(),
+  rules: zod.string().nullish(),
+  model: zod.string().optional(),
+  temperature: zod.number().optional(),
+  maxTokens: zod.number().optional(),
+});
+
+export const UpdateAgentConfigResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  persona: zod.string(),
+  rules: zod.string().nullish(),
+  model: zod.string(),
+  temperature: zod.number(),
+  maxTokens: zod.number(),
+  isActive: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List the most recent things Luna has remembered
+ */
+export const listAgentMemoriesQueryLimitDefault = 20;
+
+export const ListAgentMemoriesQueryParams = zod.object({
+  limit: zod.coerce.number().default(listAgentMemoriesQueryLimitDefault),
+});
+
+export const ListAgentMemoriesResponseItem = zod.object({
+  id: zod.number(),
+  conversationId: zod.number().nullish(),
+  content: zod.string(),
+  source: zod.string(),
+  createdAt: zod.coerce.date(),
+});
+export const ListAgentMemoriesResponse = zod.array(
+  ListAgentMemoriesResponseItem,
+);
+
+/**
+ * @summary Forget a specific memory
+ */
+export const DeleteAgentMemoryParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
  * @summary List messages in a conversation
  */
 export const ListOpenaiMessagesParams = zod.object({
