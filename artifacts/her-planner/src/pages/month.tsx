@@ -36,7 +36,7 @@ function getCycleDayPhase(dayOffset: number, cycleLength = 28, periodLength = 5)
   return "luteal";
 }
 
-export default function MonthPage() {
+export default function MonthPage({ embedded = false }: { embedded?: boolean } = {}) {
   const queryClient = useQueryClient();
   const { t } = useLanguage();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -111,11 +111,11 @@ export default function MonthPage() {
 
   return (
     <div className="flex flex-col min-h-full">
-      <header className="px-5 pt-10 pb-4">
+      <header className={embedded ? "px-5 pt-3 pb-4" : "px-5 pt-10 pb-4"}>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-serif">{format(currentDate, "MMMM yyyy")}</h1>
-            <p className="text-sm text-muted-foreground">{t.month.subtitle}</p>
+            {!embedded && <p className="text-sm text-muted-foreground">{t.month.subtitle}</p>}
           </div>
           <div className="flex gap-1">
             <button onClick={() => setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() - 1))} className="w-9 h-9 rounded-xl border border-border flex items-center justify-center hover:bg-accent transition-colors">

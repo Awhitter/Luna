@@ -56,13 +56,23 @@ function getXaiProvider() {
 }
 
 /**
- * Prefer Grok 4.5 when XAI_API_KEY is set (custom tools via chat API).
- * Otherwise OpenAI gpt-4o (or agent-config model name).
+ * Prefer Grok via Vercel AI Gateway (shared for all users), then direct XAI_API_KEY,
+ * then OpenAI / agent-config model name.
  */
 export function getModel(name?: string): LanguageModel {
+  const viaGateway =
+    process.env.AI_GATEWAY_API_KEY !== undefined ||
+    process.env.VERCEL_OIDC_TOKEN !== undefined;
+
+  if (viaGateway) {
+    // Gateway model ids look like "xai/grok-4.5"
+    const fromEnv = process.env.AI_MODEL?.trim();
+    const fromAgent = name?.includes("/") ? name : undefined;
+    return getOpenAIProvider()(fromEnv || fromAgent || "xai/grok-4.5");
+  }
+
   const xai = getXaiProvider();
   if (xai) {
-    // Agent-config may still say gpt-4o; when XAI is configured we use Grok as chat core.
     return xai.chat("grok-4.5");
   }
   return getOpenAIProvider()(name ?? "gpt-4o");

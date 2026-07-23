@@ -16,10 +16,13 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Send, Moon, CheckCircle2, Circle, Plus, ChevronRight, X } from "lucide-react";
+import { Send, Moon, CheckCircle2, Circle, Plus, ChevronRight, X, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/i18n/context";
-import { IntentLegend, type IntentId } from "@/components/intent-legend";
+import { type IntentId } from "@/components/intent-legend";
+import { IntentSwimlane } from "@/components/intent-swimlane";
+import { RollingLine } from "@/components/rolling-line";
+import { TypewriterText } from "@/components/typewriter-text";
 
 type ChatMessage = { role: "user" | "assistant"; content: string; streaming?: boolean };
 
@@ -124,6 +127,8 @@ export default function TodayPage() {
   const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [addedSuggestions, setAddedSuggestions] = useState<Set<number>>(new Set());
+  const [moodExpanded, setMoodExpanded] = useState(false);
+  const [listOpen, setListOpen] = useState(true);
 
   useEffect(() => {
     if (!ctxLoading && !profileLoading && profile && !todayCtx && !hasWizardShownToday()) {
@@ -349,32 +354,53 @@ export default function TodayPage() {
           ...(intentId ? { intentId, intentFill } : {}),
         }),
       });
+      if (!res.ok) throw new Error(`Chat failed (${res.status})`);
       if (!res.body) throw new Error("No stream");
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let fullText = "";
+      let buffer = "";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const lines = decoder.decode(value).split("\n");
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
         for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.done) break;
-              if (data.content) {
-                fullText += data.content;
-                setMessages((prev) => { const u = [...prev]; u[u.length - 1] = { role: "assistant", content: fullText, streaming: true }; return u; });
-              }
-            } catch {}
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.done) break;
+            if (data.error) throw new Error(data.error);
+            if (data.content) {
+              fullText += data.content;
+              setMessages((prev) => {
+                const u = [...prev];
+                u[u.length - 1] = { role: "assistant", content: fullText, streaming: true };
+                return u;
+              });
+            }
+          } catch (parseErr) {
+            if (parseErr instanceof Error && parseErr.message !== "stream_failed" && !parseErr.message.includes("JSON")) {
+              // ignore partial JSON chunks
+            }
           }
         }
       }
+      if (!fullText.trim()) throw new Error("Empty reply");
       const displayText = parseTasks(fullText);
-      setMessages((prev) => { const u = [...prev]; u[u.length - 1] = { role: "assistant", content: displayText, streaming: false }; return u; });
+      setMessages((prev) => {
+        const u = [...prev];
+        u[u.length - 1] = { role: "assistant", content: displayText, streaming: false };
+        return u;
+      });
       queryClient.invalidateQueries({ queryKey: getListTasksQueryKey({ view: "today" }) });
     } catch {
-      setMessages((prev) => { const u = [...prev]; u[u.length - 1] = { role: "assistant", content: t.chat.errorMessage, streaming: false }; return u; });
+      setMessages((prev) => {
+        const u = [...prev];
+        u[u.length - 1] = { role: "assistant", content: t.chat.errorMessage, streaming: false };
+        return u;
+      });
     } finally {
       setIsStreaming(false);
     }
@@ -393,9 +419,27 @@ export default function TodayPage() {
 
   const addTask = () => {
     if (!newTaskTitle.trim()) return;
+    const quickCat = (window as unknown as { __lunaQuickCat?: string }).__lunaQuickCat;
+    const category = quickCat || "home";
+    (window as unknown as { __lunaQuickCat?: string }).__lunaQuickCat = undefined;
     createTask.mutate(
-      { data: { title: newTaskTitle.trim(), category: "home", priority: "medium", view: "today", aiSuggested: false } },
-      { onSuccess: () => { setNewTaskTitle(""); setAddingTask(false); queryClient.invalidateQueries({ queryKey: getListTasksQueryKey({ view: "today" }) }); queryClient.invalidateQueries({ queryKey: getGetTasksSummaryQueryKey() }); } }
+      {
+        data: {
+          title: newTaskTitle.trim(),
+          category,
+          priority: "medium",
+          view: "today",
+          aiSuggested: false,
+        },
+      },
+      {
+        onSuccess: () => {
+          setNewTaskTitle("");
+          setAddingTask(false);
+          queryClient.invalidateQueries({ queryKey: getListTasksQueryKey({ view: "today" }) });
+          queryClient.invalidateQueries({ queryKey: getGetTasksSummaryQueryKey() });
+        },
+      },
     );
   };
 
@@ -416,85 +460,184 @@ export default function TodayPage() {
   const hour = new Date().getHours();
   const greetWord = hour < 12 ? t.greetings.morning : hour < 17 ? t.greetings.afternoon : t.greetings.evening;
 
+  const rollingPhrases =
+    lang === "es"
+      ? [
+          "Toca una idea abajo — yo arranco.",
+          "¿Cena, dinero, o solo que te escuchen?",
+          "Una cosa a la vez. Yo guardo el resto.",
+          cyclePhase?.phase && cyclePhase.phase !== "unknown"
+            ? `${t.phases[cyclePhase.phase]} · día ${cyclePhase.dayInCycle}`
+            : "Hoy cuenta. Estoy aquí.",
+        ]
+      : lang === "pt"
+        ? [
+            "Toque uma ideia abaixo — eu começo.",
+            "Jantar, dinheiro, ou só ser ouvida?",
+            "Uma coisa de cada vez. Eu guardo o resto.",
+            cyclePhase?.phase && cyclePhase.phase !== "unknown"
+              ? `${t.phases[cyclePhase.phase]} · dia ${cyclePhase.dayInCycle}`
+              : "Hoje importa. Estou aqui.",
+          ]
+        : [
+            "Tap an idea below — I’ll start.",
+            "Dinner, money, or just be heard?",
+            "One thing at a time. I’ll hold the rest.",
+            cyclePhase?.phase && cyclePhase.phase !== "unknown"
+              ? `${t.phases[cyclePhase.phase]} · day ${cyclePhase.dayInCycle}`
+              : "Today counts. I’m here.",
+          ];
+
+  const moodLabel = todayCtx?.mood ? (t.moods[todayCtx.mood] ?? todayCtx.mood) : null;
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <header className="px-5 pt-10 pb-4">
-        <p className="text-xs text-muted-foreground font-medium tracking-wide uppercase mb-1">
+      <header className="px-5 pt-9 pb-2">
+        <p className="mb-0.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
           {format(new Date(), "EEEE, MMMM do")}
         </p>
-        <h1 className="text-2xl font-serif text-foreground leading-snug">
+        <h1 className="font-serif text-[1.65rem] leading-snug text-foreground text-balance">
           {profile ? `${greetWord}, ${profile.name}` : "Welcome"}
         </h1>
-        {cyclePhase && cyclePhase.phase !== "unknown" && (
-          <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
-            <span className="w-2 h-2 rounded-full bg-primary" />
-            {t.phases[cyclePhase.phase] ?? cyclePhase.phase} · {t.cycle.day} {cyclePhase.dayInCycle}
-          </div>
-        )}
+        <RollingLine
+          phrases={rollingPhrases}
+          onClick={() => {
+            const el = document.getElementById("luna-input");
+            el?.focus();
+          }}
+        />
       </header>
 
-      {/* Check-in row */}
-      <div className="px-5 flex gap-2 mb-4 overflow-x-auto hide-scrollbar">
-        <button onClick={() => openWizardManually(1)} className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors flex-shrink-0", todayCtx?.sleepHours ? "bg-primary/10 border-primary/20 text-primary" : "bg-card border-border text-muted-foreground hover:border-primary/30")}>
-          🌙 {todayCtx?.sleepHours ? `${todayCtx.sleepHours}h` : t.checkin.logSleep}
+      {/* Compact check-in — mood collapses until tapped */}
+      <div className="mb-3 flex items-center gap-1.5 px-5">
+        <button
+          onClick={() => openWizardManually(1)}
+          className={cn(
+            "flex h-8 items-center gap-1 rounded-full border px-2.5 text-[11px] font-medium transition-colors",
+            todayCtx?.sleepHours
+              ? "border-primary/25 bg-primary/10 text-primary"
+              : "border-border bg-card text-muted-foreground",
+          )}
+        >
+          <span aria-hidden>🌙</span>
+          {todayCtx?.sleepHours ? `${todayCtx.sleepHours}h` : "—"}
         </button>
-        <button onClick={() => openWizardManually(2)} className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors flex-shrink-0", todayCtx?.energyLevel ? "bg-primary/10 border-primary/20 text-primary" : "bg-card border-border text-muted-foreground hover:border-primary/30")}>
-          ⚡ {todayCtx?.energyLevel ? `${t.checkin.logEnergy.replace("Log ", "").replace("Registrar ", "").replace("Registrar ", "")} ${todayCtx.energyLevel}/5` : t.checkin.logEnergy}
+        <button
+          onClick={() => openWizardManually(2)}
+          className={cn(
+            "flex h-8 items-center gap-1 rounded-full border px-2.5 text-[11px] font-medium transition-colors",
+            todayCtx?.energyLevel
+              ? "border-primary/25 bg-primary/10 text-primary"
+              : "border-border bg-card text-muted-foreground",
+          )}
+        >
+          <span aria-hidden>⚡</span>
+          {todayCtx?.energyLevel ? `${todayCtx.energyLevel}/5` : "—"}
         </button>
-        <button onClick={() => openWizardManually(3)} className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors flex-shrink-0", todayCtx?.mood ? "bg-primary/10 border-primary/20 text-primary" : "bg-card border-border text-muted-foreground hover:border-primary/30")}>
-          🌸 {todayCtx?.mood ? (t.moods[todayCtx.mood] ?? todayCtx.mood) : t.checkin.logMood}
+        <button
+          onClick={() => {
+            if (moodLabel) setMoodExpanded((v) => !v);
+            else openWizardManually(3);
+          }}
+          className={cn(
+            "flex h-8 min-w-0 max-w-[42%] items-center gap-1 rounded-full border px-2.5 text-[11px] font-medium transition-all",
+            moodLabel
+              ? "border-primary/25 bg-primary/10 text-primary"
+              : "border-border bg-card text-muted-foreground",
+          )}
+        >
+          <span aria-hidden>🌸</span>
+          <span className={cn("truncate", moodExpanded && "whitespace-normal")}>
+            {moodLabel ?? t.checkin.logMood}
+          </span>
+          {moodLabel && <ChevronDown className={cn("h-3 w-3 shrink-0 transition-transform", moodExpanded && "rotate-180")} />}
         </button>
       </div>
+      {moodExpanded && moodLabel && (
+        <button
+          type="button"
+          onClick={() => openWizardManually(3)}
+          className="mx-5 mb-3 rounded-2xl border border-border bg-card px-3 py-2 text-left text-xs leading-relaxed text-foreground animate-in fade-in slide-in-from-top-1 duration-200"
+        >
+          {moodLabel}
+          <span className="mt-1 block text-[10px] text-muted-foreground">
+            {lang === "es" ? "Toca para editar" : lang === "pt" ? "Toque para editar" : "Tap to edit"}
+          </span>
+        </button>
+      )}
 
       {/* Chat */}
       <div className="flex-1 flex flex-col overflow-hidden px-5">
         <div className="flex-1 overflow-y-auto space-y-3 pb-3 hide-scrollbar">
           {messages.map((msg, i) => (
-            <div key={i} className={cn("flex gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300", msg.role === "user" ? "flex-row-reverse" : "flex-row")}>
+            <div
+              key={i}
+              className={cn(
+                "flex gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300",
+                msg.role === "user" ? "flex-row-reverse" : "flex-row",
+              )}
+            >
               {msg.role === "assistant" && (
-                <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 mt-1">
-                  <Moon className="w-4 h-4 text-primary" />
+                <div className="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/15">
+                  <Moon className="h-4 w-4 text-primary" />
                 </div>
               )}
-              <div className={cn("max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap", msg.role === "assistant" ? "bg-card border border-border text-foreground rounded-tl-sm" : "bg-primary text-primary-foreground rounded-tr-sm")}>
-                {msg.content}
-                {msg.streaming && <span className="inline-block w-1.5 h-4 ml-1 bg-current animate-pulse rounded-sm" />}
+              <div
+                className={cn(
+                  "max-w-[82%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
+                  msg.role === "assistant"
+                    ? "rounded-tl-sm border border-border bg-card text-foreground"
+                    : "rounded-tr-sm bg-primary text-primary-foreground",
+                )}
+              >
+                {msg.role === "assistant" ? (
+                  <TypewriterText text={msg.content} live={Boolean(msg.streaming)} />
+                ) : (
+                  msg.content
+                )}
+                {msg.streaming && (
+                  <span className="ml-1 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-current" />
+                )}
               </div>
             </div>
           ))}
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                <Moon className="w-8 h-8 text-primary" />
+              <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+                <Moon className="h-7 w-7 text-primary" />
               </div>
-              <p className="font-medium text-foreground text-sm mb-1">{t.chat.emptyTitle}</p>
-              <p className="text-muted-foreground text-xs">{t.chat.emptySubtitle}</p>
+              <p className="mb-1 text-sm font-medium text-foreground">{t.chat.emptyTitle}</p>
+              <p className="text-xs text-muted-foreground">{t.chat.emptySubtitle}</p>
             </div>
           )}
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="pb-2 pt-2 border-t border-border">
-          <IntentLegend
+        <div className="border-t border-border/80 pb-2 pt-2">
+          <IntentSwimlane
             activeIntent={activeIntent}
-            onSelect={(intentId, draftStem) => {
+            onPick={(intentId, fullPrompt) => {
               setActiveIntent(intentId);
-              // Editable draft only — never auto-submit
-              setInput((prev) => (prev.trim() ? prev : draftStem));
+              setInput(fullPrompt);
             }}
           />
-          <div className="flex gap-2 items-end bg-card rounded-2xl border border-border px-3 py-2 focus-within:border-primary/50 transition-colors">
+          <div className="flex items-end gap-2 rounded-2xl border border-border bg-card px-3 py-2 transition-colors focus-within:border-primary/50">
             <textarea
+              id="luna-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={t.chat.placeholder}
-              className="flex-1 bg-transparent text-sm resize-none outline-none placeholder:text-muted-foreground min-h-[20px] max-h-24"
+              className="min-h-[20px] max-h-24 flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               rows={1}
             />
-            <button onClick={sendMessage} disabled={!input.trim() || isStreaming} className="w-8 h-8 rounded-xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 transition-opacity flex-shrink-0">
-              <Send className="w-4 h-4" />
+            <button
+              onClick={sendMessage}
+              disabled={!input.trim() || isStreaming}
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
+            >
+              <Send className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -547,39 +690,125 @@ export default function TodayPage() {
         </div>
       )}
 
-      {/* Tasks */}
-      <div className="px-5 py-4 border-t border-border bg-card/50">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-serif flex items-center gap-2">
-            {t.tasks.title}
-            {totalCount > 0 && <span className="text-xs font-sans text-muted-foreground font-normal">{completedCount}/{totalCount}</span>}
-          </h2>
-          <button onClick={() => setAddingTask(true)} className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 transition-colors">
-            <Plus className="w-4 h-4" />
+      {/* Capture list — tasks, groceries, errands — same inbox */}
+      <div className="border-t border-border bg-card/40 px-5 py-3">
+        <div className="mb-2 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setListOpen((v) => !v)}
+            className="flex items-center gap-2 text-left"
+          >
+            <h2 className="font-serif text-base text-foreground">
+              {lang === "es" ? "Lista de hoy" : lang === "pt" ? "Lista de hoje" : "Today’s list"}
+            </h2>
+            {totalCount > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {completedCount}/{totalCount}
+              </span>
+            )}
+            <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", listOpen && "rotate-180")} />
+          </button>
+          <button
+            onClick={() => {
+              setListOpen(true);
+              setAddingTask(true);
+            }}
+            className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors hover:bg-primary/20"
+            aria-label={t.tasks.add}
+          >
+            <Plus className="h-4 w-4" />
           </button>
         </div>
-        {tasks.length === 0 && !addingTask && (
-          <p className="text-xs text-muted-foreground text-center py-3">{t.tasks.noTasks}</p>
+        {listOpen && (
+          <div className="animate-in fade-in duration-200">
+            <div className="mb-2 flex gap-1.5 overflow-x-auto hide-scrollbar pb-1">
+              {(["home", "food", "kids", "work"] as const).map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => {
+                    setAddingTask(true);
+                    setNewTaskTitle("");
+                    // stash category via title prefix convention — create uses home by default; set via quick add below
+                    (window as unknown as { __lunaQuickCat?: string }).__lunaQuickCat = cat;
+                  }}
+                  className={cn(
+                    "flex-shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold",
+                    categoryColors[cat] || "bg-muted text-muted-foreground",
+                  )}
+                >
+                  + {cat === "food" ? (lang === "es" ? "súper" : "grocery") : cat}
+                </button>
+              ))}
+            </div>
+            {tasks.length === 0 && !addingTask && (
+              <p className="py-2 text-center text-xs text-muted-foreground">{t.tasks.noTasks}</p>
+            )}
+            <div className="max-h-40 space-y-1 overflow-y-auto hide-scrollbar">
+              {tasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="flex items-center gap-2.5 rounded-xl px-1 py-1.5 transition-colors hover:bg-accent/50"
+                >
+                  <button
+                    onClick={() => toggleTask(task.id, task.completed)}
+                    className="flex-shrink-0 text-muted-foreground transition-colors hover:text-primary"
+                  >
+                    {task.completed ? (
+                      <CheckCircle2 className="h-5 w-5 text-primary" />
+                    ) : (
+                      <Circle className="h-5 w-5" />
+                    )}
+                  </button>
+                  <span
+                    className={cn(
+                      "flex-1 text-sm",
+                      task.completed ? "text-muted-foreground line-through" : "text-foreground",
+                    )}
+                  >
+                    {task.title}
+                  </span>
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                      categoryColors[task.category] || "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {task.category}
+                  </span>
+                </div>
+              ))}
+              {addingTask && (
+                <div className="flex items-center gap-2 py-1">
+                  <Circle className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+                  <input
+                    autoFocus
+                    value={newTaskTitle}
+                    onChange={(e) => setNewTaskTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") addTask();
+                      if (e.key === "Escape") {
+                        setAddingTask(false);
+                        setNewTaskTitle("");
+                      }
+                    }}
+                    placeholder={
+                      lang === "es"
+                        ? "Tarea, súper, recado…"
+                        : lang === "pt"
+                          ? "Tarefa, mercado, recado…"
+                          : "Task, grocery, errand…"
+                    }
+                    className="flex-1 border-b border-primary/30 bg-transparent pb-1 text-sm outline-none placeholder:text-muted-foreground"
+                  />
+                  <button onClick={addTask} className="text-xs font-medium text-primary">
+                    {t.tasks.add}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         )}
-        <div className="space-y-2 max-h-48 overflow-y-auto hide-scrollbar">
-          {tasks.map((task) => (
-            <div key={task.id} className="flex items-center gap-3 py-2">
-              <button onClick={() => toggleTask(task.id, task.completed)} className="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors">
-                {task.completed ? <CheckCircle2 className="w-5 h-5 text-primary" /> : <Circle className="w-5 h-5" />}
-              </button>
-              <span className={cn("text-sm flex-1", task.completed ? "line-through text-muted-foreground" : "text-foreground")}>{task.title}</span>
-              <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium", categoryColors[task.category] || "bg-muted text-muted-foreground")}>{task.category}</span>
-            </div>
-          ))}
-          {addingTask && (
-            <div className="flex items-center gap-2 py-1">
-              <Circle className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-              <input autoFocus value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addTask(); if (e.key === "Escape") { setAddingTask(false); setNewTaskTitle(""); } }} placeholder={t.tasks.placeholder} className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground border-b border-primary/30 pb-1" />
-              <button onClick={addTask} className="text-xs text-primary font-medium">{t.tasks.add}</button>
-              <button onClick={() => { setAddingTask(false); setNewTaskTitle(""); }} className="text-xs text-muted-foreground">{t.tasks.cancel}</button>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Wizard */}

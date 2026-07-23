@@ -41,7 +41,7 @@ type RecapData = {
   };
 };
 
-export default function WeekPage() {
+export default function WeekPage({ embedded = false }: { embedded?: boolean } = {}) {
   const queryClient = useQueryClient();
   const { t, lang } = useLanguage();
   const { data: tasks = [] } = useListTasks({ view: "week" });
@@ -133,12 +133,16 @@ export default function WeekPage() {
 
   return (
     <div className="flex flex-col min-h-full">
-      <header className="px-5 pt-10 pb-5">
-        <h1 className="text-2xl font-serif">{t.week.title}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{t.week.subtitle}</p>
+      <header className={embedded ? "px-5 pt-3 pb-3" : "px-5 pt-10 pb-5"}>
+        {!embedded && (
+          <>
+            <h1 className="text-2xl font-serif">{t.week.title}</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">{t.week.subtitle}</p>
+          </>
+        )}
 
         {weekSummary && weekSummary.total > 0 && (
-          <div className="mt-4 p-4 rounded-2xl bg-card border border-border">
+          <div className={`${embedded ? "mt-1" : "mt-4"} p-4 rounded-2xl bg-card border border-border`}>
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium">{weekSummary.completed} {t.week.of} {weekSummary.total} {t.week.done}</span>
               <span className="text-sm text-primary font-medium">{Math.round(progress)}%</span>

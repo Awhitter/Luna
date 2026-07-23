@@ -6,6 +6,9 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// Vercel / reverse proxies set X-Forwarded-For; required for express-rate-limit.
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,

@@ -34,6 +34,8 @@ const aiRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests — please slow down" },
+  // trust proxy is set on the Express app; keep validation quiet on Vercel.
+  validate: { xForwardedForHeader: false, forwardedHeader: false },
 });
 
 // ─── Conversation CRUD ────────────────────────────────────────────────
@@ -202,7 +204,26 @@ router.post("/openai/conversations/:id/messages", aiRateLimit, async (req, res) 
       },
     });
 
-    result.pipeUIMessageStreamToResponse(res);
+    // Simple SSE shape the web client already understands: { content } / { done }
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders?.();
+
+    try {
+      for await (const delta of result.textStream) {
+        if (!delta) continue;
+        res.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
+      }
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (streamErr) {
+      req.log.error({ err: streamErr }, "Chat stream failed");
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify({ error: "stream_failed" })}\n\n`);
+        res.end();
+      }
+    }
     return;
   } catch (err) {
     req.log.error({ err }, "Failed to send message");

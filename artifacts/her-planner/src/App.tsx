@@ -7,11 +7,13 @@ import { InstallCoach } from "@/components/install-coach";
 import { LanguageProvider } from "@/i18n/context";
 
 import TodayPage from "@/pages/today";
+import CalendarPage from "@/pages/calendar";
 import WeekPage from "@/pages/week";
 import MonthPage from "@/pages/month";
 import CyclePage from "@/pages/cycle";
 import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
+import { SplashScreen } from "@/components/splash-screen";
 
 const queryClient = new QueryClient();
 
@@ -20,8 +22,9 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/" component={TodayPage} />
-        <Route path="/week" component={WeekPage} />
-        <Route path="/month" component={MonthPage} />
+        <Route path="/calendar" component={CalendarPage} />
+        <Route path="/week">{() => <WeekPage />}</Route>
+        <Route path="/month">{() => <MonthPage />}</Route>
         <Route path="/cycle" component={CyclePage} />
         <Route path="/settings" component={SettingsPage} />
         <Route component={NotFound} />
@@ -40,6 +43,7 @@ function App() {
           </WouterRouter>
           <Toaster />
           <InstallCoach />
+          <SplashScreen />
         </TooltipProvider>
       </QueryClientProvider>
     </LanguageProvider>
