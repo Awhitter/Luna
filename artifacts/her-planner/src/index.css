@@ -74,45 +74,45 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  /* Soft rose ink on near-white (brand hue, not cream-paper default) */
-  --background: 345 28% 98%;
-  --foreground: 345 18% 16%;
-  --border: 345 14% 90%;
-  --card: 0 0% 100%;
-  --card-foreground: 345 18% 16%;
-  --card-border: 345 14% 90%;
+  /* Richer rose ink — kitchen-light blush, not washed pastel */
+  --background: 345 32% 94%;
+  --foreground: 345 28% 12%;
+  --border: 345 22% 82%;
+  --card: 345 40% 98.5%;
+  --card-foreground: 345 28% 12%;
+  --card-border: 345 22% 82%;
 
-  --sidebar: 345 28% 98%;
-  --sidebar-foreground: 345 18% 16%;
-  --sidebar-border: 345 14% 90%;
-  --sidebar-primary: 345 42% 52%;
+  --sidebar: 345 32% 94%;
+  --sidebar-foreground: 345 28% 12%;
+  --sidebar-border: 345 22% 82%;
+  --sidebar-primary: 345 58% 42%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 345 22% 94%;
-  --sidebar-accent-foreground: 345 18% 16%;
-  --sidebar-ring: 345 42% 52%;
+  --sidebar-accent: 345 28% 92%;
+  --sidebar-accent-foreground: 345 28% 12%;
+  --sidebar-ring: 345 58% 42%;
 
-  --popover: 0 0% 100%;
-  --popover-foreground: 345 18% 16%;
-  --popover-border: 345 14% 90%;
+  --popover: 345 40% 98.5%;
+  --popover-foreground: 345 28% 12%;
+  --popover-border: 345 22% 82%;
 
-  --primary: 345 42% 52%;
+  --primary: 345 58% 42%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 345 22% 94%;
-  --secondary-foreground: 345 18% 16%;
-  --muted: 345 18% 94%;
-  --muted-foreground: 345 12% 36%;
-  --accent: 345 20% 94%;
-  --accent-foreground: 345 18% 16%;
-  --destructive: 0 60% 60%;
+  --secondary: 345 28% 92%;
+  --secondary-foreground: 345 28% 14%;
+  --muted: 345 22% 92%;
+  --muted-foreground: 345 16% 30%;
+  --accent: 345 30% 93%;
+  --accent-foreground: 345 28% 14%;
+  --destructive: 0 62% 48%;
   --destructive-foreground: 0 0% 100%;
 
-  --input: 345 14% 86%;
-  --ring: 345 42% 52%;
-  --chart-1: 345 42% 52%;
-  --chart-2: 24 30% 72%;
-  --chart-3: 180 20% 68%;
-  --chart-4: 280 25% 65%;
-  --chart-5: 45 40% 68%;
+  --input: 345 20% 86%;
+  --ring: 345 58% 42%;
+  --chart-1: 345 58% 42%;
+  --chart-2: 24 42% 52%;
+  --chart-3: 180 28% 42%;
+  --chart-4: 280 28% 48%;
+  --chart-5: 45 48% 48%;
 
   --app-font-sans: 'Plus Jakarta Sans', sans-serif;
   --app-font-serif: 'Fraunces', serif;
@@ -212,6 +212,17 @@
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-serif tracking-tight;
+  }
+}
+
+@keyframes luna-caret {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes luna-caret {
+    0%, 100% { opacity: 1; }
   }
 }
 

@@ -12,8 +12,8 @@ export function Layout({ children }: { children: ReactNode }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     );
   }
@@ -37,20 +37,28 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="relative flex min-h-[100dvh] flex-col bg-background">
-      {/* Soft full-bleed atmosphere — not a phone stub */}
+      {/* Atmosphere outside the stage */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_hsla(345,42%,52%,0.07),_transparent_55%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_-10%,hsla(345,55%,48%,0.18),transparent_55%),radial-gradient(80%_50%_at_100%_100%,hsla(20,40%,55%,0.08),transparent_50%)]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.035]"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+        }}
       />
 
       <nav
         className={cn(
-          "fixed inset-x-0 z-50 border-border/80 bg-card/90 backdrop-blur-xl",
+          "fixed inset-x-0 z-50 border-border/70 bg-card/92 backdrop-blur-xl",
           "bottom-0 border-t pb-safe",
-          "md:bottom-auto md:top-0 md:border-b md:border-t-0 md:pb-0",
+          "md:bottom-auto md:top-0 md:border-b md:border-t-0 md:bg-background/80 md:pb-0",
         )}
       >
-        <div className="mx-auto flex max-w-[42rem] items-center justify-around px-2 py-1.5 md:justify-start md:gap-1 md:px-4 md:py-2">
+        <div className="mx-auto flex max-w-[44rem] items-center justify-around px-2 py-1.5 md:justify-center md:gap-1 md:px-4 md:py-2.5">
           {navItems.map((item) => {
             const isActive = item.match(location);
             const Icon = item.icon;
@@ -59,11 +67,10 @@ export function Layout({ children }: { children: ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center justify-center rounded-2xl py-2 transition-all duration-200 ease-out md:flex-row md:gap-2 md:px-3 md:py-2",
-                  "w-[4.5rem] md:w-auto",
+                  "flex w-[4.5rem] flex-col items-center justify-center rounded-2xl py-2 transition-all duration-200 ease-out md:w-auto md:flex-row md:gap-2 md:px-3.5 md:py-2",
                   isActive
-                    ? "bg-primary/12 text-primary"
-                    : "text-muted-foreground hover:bg-accent/70 hover:text-foreground",
+                    ? "bg-primary/14 text-primary shadow-sm"
+                    : "text-muted-foreground hover:bg-accent/80 hover:text-foreground",
                 )}
               >
                 <Icon
@@ -77,16 +84,26 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       </nav>
 
-      {/* Today: shell locked, thread scrolls. Other pages: main scrolls. */}
       <main
         className={cn(
           "relative z-[1] flex min-h-0 flex-1 flex-col",
-          isToday ? "overflow-hidden" : "overflow-y-auto",
           "pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))]",
-          "md:pb-0 md:pt-14",
+          "md:pb-4 md:pt-[4.25rem]",
+          isToday ? "overflow-hidden" : "overflow-y-auto",
         )}
       >
-        {isToday ? children : <div className="mx-auto w-full max-w-[42rem]">{children}</div>}
+        {/* Framed stage — clear boundary on every viewport */}
+        <div
+          className={cn(
+            "luna-stage mx-auto flex min-h-0 w-full max-w-[44rem] flex-1 flex-col",
+            "border-x border-border/80 bg-card shadow-[0_0_0_1px_hsla(345,30%,40%,0.04),0_20px_50px_-24px_hsla(345,40%,20%,0.28)]",
+            "md:my-0 md:max-h-[calc(100dvh-5.5rem)] md:rounded-3xl md:border",
+            !isToday && "overflow-y-auto",
+            isToday && "overflow-hidden",
+          )}
+        >
+          {children}
+        </div>
       </main>
     </div>
   );

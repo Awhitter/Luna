@@ -5,6 +5,8 @@ import {
   type Task,
 } from "@workspace/db";
 import { type AgentConfig } from "@workspace/db";
+import { localDateKey } from "./local-date";
+import { loadSoul } from "./soul";
 
 export const LANGUAGE_NAMES: Record<string, string> = {
   en: "English",
@@ -42,13 +44,17 @@ export function buildSystemContext(input: BuildContextInput): string {
     conversationSummary,
   } = input;
 
-  const todayISO = new Date().toISOString().split("T")[0]!;
+  const todayISO = localDateKey();
   const energy = clampEnergy(today?.energyLevel ?? null);
   const sleep = today?.sleepHours != null ? today.sleepHours : null;
   const mood = today?.mood?.trim() ? today.mood.trim() : null;
   const hasTodayRow = Boolean(today && today.date === todayISO);
 
+  const soul = loadSoul();
   let ctx = `${agent.persona}\n\n`;
+  if (soul) {
+    ctx += `SOUL (voice & posture — follow this texture):\n${soul}\n\n`;
+  }
 
   // Canonical vitals — model must not invent or contradict
   ctx += `AUTHORITATIVE (do not invent or contradict; if a field says "not logged", do not guess a number):\n`;

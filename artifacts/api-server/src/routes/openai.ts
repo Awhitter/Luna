@@ -25,6 +25,7 @@ import {
   getIntent,
   toolsForIntent,
 } from "../lib/luna";
+import { localDateKey } from "../lib/luna/local-date";
 
 const router = Router();
 
@@ -114,7 +115,7 @@ const SendMessageBody = z.object({
 });
 
 async function loadLunaContext(language: string, extraSymptoms?: string[]) {
-  const todayISO = new Date().toISOString().split("T")[0]!;
+  const todayISO = localDateKey();
   const [agent, profileRows, cycleRows, todayRows, taskRows] = await Promise.all([
     getActiveAgentConfig(),
     db.select().from(profiles).limit(1),
@@ -350,7 +351,7 @@ router.post("/openai/profile-greeting", aiRateLimit, async (req, res) => {
     const ctx = await loadLunaContext(language);
     const langName = LANGUAGE_NAMES[language] ?? "Spanish";
     const name = ctx.profile?.name ?? "there";
-    const todayISO = new Date().toISOString().split("T")[0];
+    const todayISO = localDateKey();
     const hasCheckin = ctx.today?.date === todayISO;
     const cycleContext = computeCyclePhaseSnippet(ctx.profile, ctx.lastPeriod);
 

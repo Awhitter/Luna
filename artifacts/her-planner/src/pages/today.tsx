@@ -23,7 +23,7 @@ import { type IntentId } from "@/components/intent-legend";
 import { IntentDock } from "@/components/intent-dock";
 import { StatusPill } from "@/components/status-pill";
 import { ListaSheet } from "@/components/lista-sheet";
-import { TypewriterText } from "@/components/typewriter-text";
+import { localDateKey } from "@/lib/local-date";
 
 type ChatMessage = { role: "user" | "assistant"; content: string; streaming?: boolean };
 
@@ -36,7 +36,7 @@ const WIZARD_STEP_KEYS = ["sleep", "energy", "mood"] as const;
 
 let webConvInitPromise: Promise<number> | null = null;
 
-const TODAY_STR = new Date().toISOString().split("T")[0];
+const TODAY_STR = localDateKey();
 const WIZARD_SHOWN_KEY = "luna-wizard-shown";
 
 function hasWizardShownToday(): boolean {
@@ -231,10 +231,7 @@ export default function TodayPage() {
       if (!res.ok) throw new Error("Failed");
       const data = await res.json() as SuggestionsData;
       setSuggestions(data);
-      // Surface in-thread — never a permanent panel under the chat
-      if (data.message?.trim()) {
-        setMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
-      }
+      // Cards only — don't also dump a second Luna wall of text
     } catch {
       // silently fail
     } finally {
@@ -260,8 +257,11 @@ export default function TodayPage() {
       if (!res.ok) return;
       const { message } = await res.json() as { message: string };
       setMessages((prev) => {
-        const withoutGreeting = prev.length === 1 ? [] : prev;
-        return [...withoutGreeting, { role: "assistant", content: message }];
+        // Replace the opener — don't stack greeting + check-in + walls
+        if (prev.length <= 1 && prev.every((m) => m.role === "assistant")) {
+          return [{ role: "assistant", content: message }];
+        }
+        return [...prev, { role: "assistant", content: message }];
       });
     } catch {
       // silently fail
@@ -269,19 +269,34 @@ export default function TodayPage() {
   }, [lang]);
 
   const saveWizard = () => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = localDateKey();
     const energyLevel = clampEnergy(wizardData.energyLevel) ?? 3;
     const payload = {
       date: today,
       sleepHours: wizardData.sleepHours,
       energyLevel,
-      mood: wizardData.mood || undefined,
+      mood: wizardData.mood?.trim() || undefined,
     };
+    // Optimistic — pill must not flash the old "Meh" while the network runs
+    queryClient.setQueryData(getGetTodayContextQueryKey(), (prev: unknown) => {
+      const base =
+        prev && typeof prev === "object"
+          ? (prev as Record<string, unknown>)
+          : { id: 0, date: today, createdAt: new Date().toISOString() };
+      return {
+        ...base,
+        date: today,
+        sleepHours: payload.sleepHours,
+        energyLevel,
+        mood: payload.mood ?? null,
+      };
+    });
     createDailyContext.mutate(
       { data: payload },
       {
-        onSuccess: () => {
+        onSuccess: (row) => {
           setWizardOpen(false);
+          queryClient.setQueryData(getGetTodayContextQueryKey(), row);
           queryClient.invalidateQueries({ queryKey: getGetTodayContextQueryKey() });
           fetchSuggestions();
           if (conversationId) {
@@ -292,6 +307,9 @@ export default function TodayPage() {
               convId: conversationId,
             });
           }
+        },
+        onError: () => {
+          queryClient.invalidateQueries({ queryKey: getGetTodayContextQueryKey() });
         },
       }
     );
@@ -512,20 +530,23 @@ export default function TodayPage() {
   const hour = new Date().getHours();
   const greetWord = hour < 12 ? t.greetings.morning : hour < 17 ? t.greetings.afternoon : t.greetings.evening;
 
-  const moodLabel = todayCtx?.mood ? (t.moods[todayCtx.mood] ?? todayCtx.mood) : null;
+  const moodRaw = todayCtx?.mood ? (t.moods[todayCtx.mood] ?? todayCtx.mood) : null;
+  const moodLabel =
+    moodRaw && moodRaw.length > 28 ? `${moodRaw.slice(0, 26).trimEnd()}…` : moodRaw;
   const phaseLabel =
     cyclePhase?.phase && cyclePhase.phase !== "unknown"
       ? `${t.phases[cyclePhase.phase]} · ${cyclePhase.dayInCycle}`
       : null;
   const checkinLabel =
     lang === "es" ? "Registrar" : lang === "pt" ? "Registrar" : "Check in";
-  const showPromptChips = messages.length <= 2 && !isStreaming;
+  const hasUserMessage = messages.some((m) => m.role === "user");
+  const showPromptChips = !hasUserMessage && !isStreaming && messages.length <= 2;
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-[42rem] flex-col">
-      <header className="flex shrink-0 items-center justify-between gap-3 px-4 pb-2 pt-3 md:px-5 md:pt-4">
+    <div className="flex h-full min-h-0 w-full flex-col">
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-card/80 px-4 pb-3 pt-3.5 backdrop-blur-sm md:px-5">
         <div className="min-w-0">
-          <h1 className="truncate font-sans text-[1.05rem] font-semibold tracking-tight text-foreground">
+          <h1 className="truncate font-sans text-[1.15rem] font-semibold tracking-tight text-foreground">
             {profile ? `${greetWord}, ${profile.name}` : "Luna"}
           </h1>
           <p className="text-[11px] text-muted-foreground">{format(new Date(), "EEEE, MMM d")}</p>
@@ -535,14 +556,14 @@ export default function TodayPage() {
             sleepHours={todayCtx?.sleepHours}
             energyLevel={clampEnergy(todayCtx?.energyLevel)}
             moodLabel={moodLabel}
-            phaseLabel={phaseLabel}
+            phaseLabel={null}
             checkinLabel={checkinLabel}
-            onClick={() => openWizardManually(todayCtx ? 1 : 1)}
+            onClick={() => openWizardManually(moodRaw ? 3 : 1)}
           />
           <button
             type="button"
             onClick={() => setListOpen(true)}
-            className="relative flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+            className="relative flex h-9 w-9 items-center justify-center rounded-full border border-border bg-secondary text-foreground transition-colors hover:border-primary/40 hover:text-primary"
             aria-label={lang === "es" ? "Lista" : "List"}
           >
             <ListTodo className="h-4 w-4" />
@@ -555,48 +576,45 @@ export default function TodayPage() {
         </div>
       </header>
 
-      {/* Thread — sole message scroll */}
+      {/* Thread — sole message scroll; owns the stage */}
       <div
         ref={chatListRef}
         onScroll={onChatScroll}
-        className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-3 hide-scrollbar md:px-5"
+        className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[linear-gradient(180deg,hsla(345,40%,96%,0.65)_0%,transparent_120px)] px-4 py-4 hide-scrollbar md:px-5"
       >
         {messages.map((msg, i) => (
           <div
             key={i}
             className={cn(
-              "flex gap-2",
-              !msg.streaming && "animate-in fade-in slide-in-from-bottom-2 duration-200",
+              "flex gap-2.5",
+              !msg.streaming && "animate-in fade-in duration-200",
               msg.role === "user" ? "flex-row-reverse" : "flex-row",
             )}
           >
             {msg.role === "assistant" && (
-              <div className="mt-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-primary/15">
-                <Moon className="h-3.5 w-3.5 text-primary" />
+              <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
+                <Moon className="h-3.5 w-3.5" />
               </div>
             )}
             <div
               className={cn(
-                "max-w-[min(85%,36rem)] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
+                "max-w-[min(88%,36rem)] whitespace-pre-wrap px-3.5 py-2.5 text-[15px] leading-[1.55]",
                 msg.role === "assistant"
-                  ? "rounded-tl-sm border border-border bg-card text-foreground"
-                  : "rounded-tr-sm bg-primary text-primary-foreground",
+                  ? "rounded-2xl rounded-tl-md border border-border/90 bg-background text-foreground shadow-sm"
+                  : "rounded-2xl rounded-tr-md bg-primary text-primary-foreground shadow-sm",
               )}
             >
-              {msg.role === "assistant" ? (
-                msg.streaming ? (
-                  <>
-                    {msg.content}
-                    <span
-                      className="ml-0.5 inline-block h-[1.1em] w-[2px] translate-y-[2px] bg-primary align-middle animate-pulse"
-                      aria-hidden
-                    />
-                  </>
-                ) : i === 0 && messages.length === 1 ? (
-                  <TypewriterText text={msg.content} />
-                ) : (
-                  msg.content
-                )
+              {msg.role === "assistant" && msg.streaming ? (
+                <>
+                  {msg.content || (
+                    <span className="text-muted-foreground">…</span>
+                  )}
+                  <span
+                    className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[2px] bg-primary/80 align-middle"
+                    style={{ animation: "luna-caret 1.1s steps(1) infinite" }}
+                    aria-hidden
+                  />
+                </>
               ) : (
                 msg.content
               )}
@@ -620,9 +638,9 @@ export default function TodayPage() {
         )}
 
         {showSuggestionCards && (
-          <div className="ml-9 space-y-1.5 rounded-2xl border border-border bg-card p-3 animate-in fade-in duration-200">
+          <div className="ml-10 space-y-1.5 rounded-2xl border border-primary/20 bg-primary/[0.04] p-3 shadow-sm animate-in fade-in duration-200">
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-[11px] font-medium text-muted-foreground">{t.luna.suggests}</span>
+              <span className="text-[11px] font-semibold text-primary">{t.luna.suggests}</span>
               <button
                 type="button"
                 onClick={() => setSuggestionsDismissed(true)}
@@ -674,8 +692,8 @@ export default function TodayPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Composer dock */}
-      <div className="shrink-0 border-t border-border/80 bg-background/95 px-4 pb-2 pt-2 backdrop-blur-sm md:px-5">
+      {/* Composer dock — grounded surface */}
+      <div className="shrink-0 border-t border-border bg-card px-4 pb-3 pt-2.5 shadow-[0_-8px_24px_-16px_hsla(345,40%,20%,0.35)] md:px-5 md:rounded-b-3xl">
         <IntentDock
           activeIntent={activeIntent}
           showSuggestions={showPromptChips}
@@ -690,21 +708,21 @@ export default function TodayPage() {
             document.getElementById("luna-input")?.focus();
           }}
         />
-        <div className="flex items-end gap-2 rounded-2xl border border-border bg-card px-3 py-2 transition-colors focus-within:border-primary/50">
+        <div className="flex items-end gap-2 rounded-2xl border-2 border-border bg-background px-3 py-2.5 transition-colors focus-within:border-primary/55">
           <textarea
             id="luna-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t.chat.placeholder}
-            className="max-h-24 min-h-[20px] flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            className="max-h-28 min-h-[22px] flex-1 resize-none bg-transparent text-[15px] outline-none placeholder:text-muted-foreground/80"
             rows={1}
           />
           <button
             type="button"
             onClick={sendMessage}
             disabled={!input.trim() || isStreaming}
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-opacity disabled:opacity-40"
           >
             <Send className="h-4 w-4" />
           </button>

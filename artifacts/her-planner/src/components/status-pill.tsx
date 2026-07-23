@@ -33,10 +33,10 @@ export function StatusPill({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors duration-200",
+        "inline-flex max-w-[min(100%,14rem)] items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors duration-200",
         hasAny
-          ? "border-primary/25 bg-primary/10 text-primary hover:bg-primary/15"
-          : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground",
+          ? "border-primary/30 bg-primary/12 text-primary hover:bg-primary/18"
+          : "border-border bg-secondary text-muted-foreground hover:border-primary/30 hover:text-foreground",
         className,
       )}
     >

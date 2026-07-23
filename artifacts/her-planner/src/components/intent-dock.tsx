@@ -65,12 +65,11 @@ export function IntentDock({
 }: Props) {
   const { lang } = useLanguage();
   const [hint, setHint] = useState(false);
-
   const chips = useMemo(() => SUGGESTIONS, []);
 
   return (
-    <div className="space-y-1.5 pb-1.5">
-      <div className="flex items-center justify-between gap-1">
+    <div className="space-y-2 pb-2">
+      <div className="flex items-center gap-1">
         {ORDER.map((id) => {
           const stem = STEMS[id];
           const label = stem.short[lang] ?? stem.short.es;
@@ -85,20 +84,20 @@ export function IntentDock({
                 onPickMode(id, draft);
               }}
               className={cn(
-                "min-w-0 flex-1 rounded-xl px-1 py-1.5 text-[11px] font-medium transition-colors duration-150",
+                "min-w-0 flex-1 rounded-lg px-1 py-1.5 text-[11px] font-semibold transition-colors duration-150",
                 active
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted/70 text-muted-foreground hover:bg-accent hover:text-foreground",
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-secondary text-secondary-foreground hover:bg-accent",
               )}
             >
-              <span className="truncate block">{label}</span>
+              <span className="block truncate">{label}</span>
             </button>
           );
         })}
       </div>
 
       {showSuggestions && (
-        <div className="flex gap-1.5 overflow-x-auto hide-scrollbar py-0.5">
+        <div className="flex gap-2 overflow-x-auto hide-scrollbar py-0.5">
           {chips.map((chip, i) => {
             const label = chip.label[lang] ?? chip.label.es;
             return (
@@ -110,9 +109,9 @@ export function IntentDock({
                   onPickSuggestion(chip.intentId, label);
                 }}
                 className={cn(
-                  "flex-shrink-0 max-w-[70vw] rounded-full border border-border bg-card px-3 py-1.5",
-                  "text-left text-[11px] font-medium leading-snug text-foreground",
-                  "transition-colors duration-150 hover:border-primary/40",
+                  "flex-shrink-0 max-w-[72vw] rounded-full border border-border bg-background px-3.5 py-2",
+                  "text-left text-[12px] font-medium leading-snug text-foreground shadow-sm",
+                  "transition-colors duration-150 hover:border-primary/45 hover:bg-primary/[0.04]",
                 )}
               >
                 {label}
@@ -122,7 +121,7 @@ export function IntentDock({
         </div>
       )}
 
-      {hint && (
+      {hint && showSuggestions && (
         <p className="px-0.5 text-[10px] text-muted-foreground animate-in fade-in duration-150">
           {lang === "es"
             ? "Toca enviar — o edita antes."

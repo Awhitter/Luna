@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, dailyContexts } from "@workspace/db";
 import { eq, desc, asc } from "drizzle-orm";
 import { CreateDailyContextBody } from "@workspace/api-zod";
+import { localDateKey, toDateKey } from "../lib/luna/local-date";
 
 const router = Router();
 
@@ -27,8 +28,10 @@ router.post("/daily-context", async (req, res) => {
     if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
 
     const energyLevel = clampEnergy(parsed.data.energyLevel ?? null);
+    // text("date") unique key — never pass a Date object through drizzle
+    const dateKey = toDateKey(parsed.data.date as unknown as string | Date);
 
-    const existing = await db.select().from(dailyContexts).where(eq(dailyContexts.date, parsed.data.date));
+    const existing = await db.select().from(dailyContexts).where(eq(dailyContexts.date, dateKey));
     if (existing.length > 0) {
       const updated = await db.update(dailyContexts)
         .set({
@@ -37,13 +40,13 @@ router.post("/daily-context", async (req, res) => {
           mood: parsed.data.mood ?? null,
           notes: parsed.data.notes ?? null,
         })
-        .where(eq(dailyContexts.date, parsed.data.date))
+        .where(eq(dailyContexts.date, dateKey))
         .returning();
       return res.status(201).json(updated[0]);
     }
 
     const result = await db.insert(dailyContexts).values({
-      date: parsed.data.date,
+      date: dateKey,
       sleepHours: parsed.data.sleepHours ?? null,
       energyLevel,
       mood: parsed.data.mood ?? null,
@@ -87,10 +90,10 @@ router.get("/daily-context/streak", async (req, res) => {
     }
 
     // Current streak: walk backwards from today (or yesterday)
-    const todayISO = new Date().toISOString().split("T")[0]!;
+    const todayISO = localDateKey();
     const yesterdayDate = new Date();
     yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterdayISO = yesterdayDate.toISOString().split("T")[0]!;
+    const yesterdayISO = localDateKey(yesterdayDate);
 
     const dateSet = new Set(dates);
     let currentStreak = 0;
@@ -98,9 +101,9 @@ router.get("/daily-context/streak", async (req, res) => {
     // Only count if last check-in was today or yesterday
     if (lastCheckinDate === todayISO || lastCheckinDate === yesterdayISO) {
       const startISO = lastCheckinDate === todayISO ? todayISO : yesterdayISO;
-      let cursor = new Date(startISO);
+      let cursor = new Date(`${startISO}T12:00:00`);
       while (true) {
-        const iso = cursor.toISOString().split("T")[0]!;
+        const iso = localDateKey(cursor);
         if (!dateSet.has(iso)) break;
         currentStreak++;
         cursor.setDate(cursor.getDate() - 1);
@@ -116,7 +119,7 @@ router.get("/daily-context/streak", async (req, res) => {
 
 router.get("/daily-context/today", async (req, res) => {
   try {
-    const today = new Date().toISOString().split("T")[0];
+    const today = localDateKey();
     const result = await db.select().from(dailyContexts).where(eq(dailyContexts.date, today));
     if (result.length === 0) return res.status(404).json({ error: "No entry for today" });
     return res.json(result[0]);
