@@ -1,7 +1,7 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { db, conversations, messages, profiles, cycleEntries, dailyContexts, tasks } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { generateObject, streamText, stepCountIs, type ModelMessage } from "ai";
 import { z } from "zod";
 import {
@@ -114,17 +114,24 @@ const SendMessageBody = z.object({
 });
 
 async function loadLunaContext(language: string, extraSymptoms?: string[]) {
+  const todayISO = new Date().toISOString().split("T")[0]!;
   const [agent, profileRows, cycleRows, todayRows, taskRows] = await Promise.all([
     getActiveAgentConfig(),
     db.select().from(profiles).limit(1),
     db.select().from(cycleEntries).orderBy(desc(cycleEntries.date)).limit(5),
-    db.select().from(dailyContexts).orderBy(desc(dailyContexts.date)).limit(1),
-    db.select().from(tasks).limit(20),
+    // Same truth as /daily-context/today — never feed yesterday as "today"
+    db.select().from(dailyContexts).where(eq(dailyContexts.date, todayISO)).limit(1),
+    db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.view, "today"), eq(tasks.completed, false)))
+      .orderBy(desc(tasks.updatedAt))
+      .limit(12),
   ]);
   const profile = profileRows[0];
   const today = todayRows[0];
   const lastPeriod = cycleRows.find((e) => e.entryType === "period_start");
-  const pendingTasks = taskRows.filter((t) => !t.completed).slice(0, 8);
+  const pendingTasks = taskRows.slice(0, 8);
   const symptoms = extraSymptoms && extraSymptoms.length > 0 ? extraSymptoms : undefined;
   return { agent, profile, today, lastPeriod, pendingTasks, language, symptoms };
 }
@@ -185,8 +192,9 @@ router.post("/openai/conversations/:id/messages", aiRateLimit, async (req, res) 
       system: systemContext,
       messages: modelMessages,
       ...(tools ? { tools, toolChoice: "auto" as const } : {}),
-      temperature: ctx.agent.temperature,
-      maxOutputTokens: ctx.agent.maxTokens,
+      // Grounded chat: shorter + less drift than creative/recap endpoints
+      temperature: Math.min(ctx.agent.temperature ?? 0.6, 0.6),
+      maxOutputTokens: Math.min(ctx.agent.maxTokens ?? 500, 500),
       stopWhen: stepCountIs(5),
       onFinish: async ({ text }) => {
         try {

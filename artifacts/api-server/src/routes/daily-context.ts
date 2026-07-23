@@ -16,17 +16,24 @@ router.get("/daily-context", async (req, res) => {
   }
 });
 
+function clampEnergy(n: number | null | undefined): number | null {
+  if (n == null || Number.isNaN(Number(n))) return null;
+  return Math.min(5, Math.max(1, Math.round(Number(n))));
+}
+
 router.post("/daily-context", async (req, res) => {
   try {
     const parsed = CreateDailyContextBody.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
+
+    const energyLevel = clampEnergy(parsed.data.energyLevel ?? null);
 
     const existing = await db.select().from(dailyContexts).where(eq(dailyContexts.date, parsed.data.date));
     if (existing.length > 0) {
       const updated = await db.update(dailyContexts)
         .set({
           sleepHours: parsed.data.sleepHours ?? null,
-          energyLevel: parsed.data.energyLevel ?? null,
+          energyLevel,
           mood: parsed.data.mood ?? null,
           notes: parsed.data.notes ?? null,
         })
@@ -38,7 +45,7 @@ router.post("/daily-context", async (req, res) => {
     const result = await db.insert(dailyContexts).values({
       date: parsed.data.date,
       sleepHours: parsed.data.sleepHours ?? null,
-      energyLevel: parsed.data.energyLevel ?? null,
+      energyLevel,
       mood: parsed.data.mood ?? null,
       notes: parsed.data.notes ?? null,
     }).returning();

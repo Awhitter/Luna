@@ -54,6 +54,19 @@ function markWizardShownToday(): void {
   localStorage.setItem(WIZARD_SHOWN_KEY, TODAY_STR);
 }
 
+/** Hide incomplete / complete [TASKS:...] payload from the bubble while streaming. */
+function hideTasksMarker(text: string): string {
+  const marker = "[TASKS:";
+  const start = text.indexOf(marker);
+  if (start === -1) return text;
+  return text.slice(0, start).trimEnd();
+}
+
+function clampEnergy(n: number | null | undefined): number | null {
+  if (n == null || Number.isNaN(n)) return null;
+  return Math.min(5, Math.max(1, Math.round(n)));
+}
+
 function extractTasksFromText(text: string): {
   cleanText: string;
   taskData: { tasks: Array<{ title: string; category: string; priority: string; view: string }> } | null;
@@ -115,6 +128,10 @@ export default function TodayPage() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [conversationId, setConversationId] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatListRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
+  const streamTextRef = useRef("");
+  const streamRafRef = useRef<number | null>(null);
 
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [addingTask, setAddingTask] = useState(false);
@@ -197,8 +214,18 @@ export default function TodayPage() {
   }, [conversationId, profile, cyclePhase, lang]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (!stickToBottomRef.current) return;
+    messagesEndRef.current?.scrollIntoView({
+      behavior: isStreaming ? "auto" : "smooth",
+      block: "end",
+    });
+  }, [messages, isStreaming]);
+
+  const onChatScroll = () => {
+    const el = chatListRef.current;
+    if (!el) return;
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+  };
 
   const fetchSuggestions = useCallback(async () => {
     setSuggestionsLoading(true);
@@ -248,10 +275,11 @@ export default function TodayPage() {
 
   const saveWizard = () => {
     const today = new Date().toISOString().split("T")[0];
+    const energyLevel = clampEnergy(wizardData.energyLevel) ?? 3;
     const payload = {
       date: today,
       sleepHours: wizardData.sleepHours,
-      energyLevel: wizardData.energyLevel,
+      energyLevel,
       mood: wizardData.mood || undefined,
     };
     createDailyContext.mutate(
@@ -264,7 +292,7 @@ export default function TodayPage() {
           if (conversationId) {
             triggerCheckinConversation({
               sleepHours: wizardData.sleepHours,
-              energyLevel: wizardData.energyLevel,
+              energyLevel,
               mood: wizardData.mood,
               convId: conversationId,
             });
@@ -282,7 +310,7 @@ export default function TodayPage() {
   const openWizardManually = (startStep: number) => {
     setWizardData({
       sleepHours: todayCtx?.sleepHours ?? 7,
-      energyLevel: todayCtx?.energyLevel ?? 3,
+      energyLevel: clampEnergy(todayCtx?.energyLevel) ?? 3,
       mood: todayCtx?.mood ?? "",
     });
     setWizardStep(startStep);
@@ -330,6 +358,17 @@ export default function TodayPage() {
     [createTask, queryClient]
   );
 
+  const paintStreamFrame = useCallback(() => {
+    streamRafRef.current = null;
+    const visible = hideTasksMarker(streamTextRef.current);
+    setMessages((prev) => {
+      const u = [...prev];
+      if (u.length === 0) return prev;
+      u[u.length - 1] = { role: "assistant", content: visible, streaming: true };
+      return u;
+    });
+  }, []);
+
   const sendMessage = useCallback(async () => {
     if (!input.trim() || isStreaming || !conversationId) return;
     const userMsg = input.trim();
@@ -340,9 +379,18 @@ export default function TodayPage() {
         : undefined;
     setInput("");
     setActiveIntent(null);
-    setMessages((prev) => [...prev, { role: "user", content: userMsg }]);
+    stickToBottomRef.current = true;
+    streamTextRef.current = "";
+    if (streamRafRef.current != null) {
+      cancelAnimationFrame(streamRafRef.current);
+      streamRafRef.current = null;
+    }
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: userMsg },
+      { role: "assistant", content: "", streaming: true },
+    ]);
     setIsStreaming(true);
-    setMessages((prev) => [...prev, { role: "assistant", content: "", streaming: true }]);
 
     try {
       const res = await fetch(`/api/openai/conversations/${conversationId}/messages`, {
@@ -374,18 +422,21 @@ export default function TodayPage() {
             if (data.error) throw new Error(data.error);
             if (data.content) {
               fullText += data.content;
-              setMessages((prev) => {
-                const u = [...prev];
-                u[u.length - 1] = { role: "assistant", content: fullText, streaming: true };
-                return u;
-              });
+              streamTextRef.current = fullText;
+              if (streamRafRef.current == null) {
+                streamRafRef.current = requestAnimationFrame(paintStreamFrame);
+              }
             }
           } catch (parseErr) {
-            if (parseErr instanceof Error && parseErr.message !== "stream_failed" && !parseErr.message.includes("JSON")) {
-              // ignore partial JSON chunks
+            if (!(parseErr instanceof SyntaxError)) {
+              // ignore partial JSON; rethrow real stream errors via empty check
             }
           }
         }
+      }
+      if (streamRafRef.current != null) {
+        cancelAnimationFrame(streamRafRef.current);
+        streamRafRef.current = null;
       }
       if (!fullText.trim()) throw new Error("Empty reply");
       const displayText = parseTasks(fullText);
@@ -396,6 +447,10 @@ export default function TodayPage() {
       });
       queryClient.invalidateQueries({ queryKey: getListTasksQueryKey({ view: "today" }) });
     } catch {
+      if (streamRafRef.current != null) {
+        cancelAnimationFrame(streamRafRef.current);
+        streamRafRef.current = null;
+      }
       setMessages((prev) => {
         const u = [...prev];
         u[u.length - 1] = { role: "assistant", content: t.chat.errorMessage, streaming: false };
@@ -404,7 +459,7 @@ export default function TodayPage() {
     } finally {
       setIsStreaming(false);
     }
-  }, [input, activeIntent, isStreaming, conversationId, parseTasks, queryClient, lang, t]);
+  }, [input, activeIntent, isStreaming, conversationId, parseTasks, queryClient, lang, t, paintStreamFrame]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -527,13 +582,15 @@ export default function TodayPage() {
           onClick={() => openWizardManually(2)}
           className={cn(
             "flex h-8 items-center gap-1 rounded-full border px-2.5 text-[11px] font-medium transition-colors",
-            todayCtx?.energyLevel
+            clampEnergy(todayCtx?.energyLevel) != null
               ? "border-primary/25 bg-primary/10 text-primary"
               : "border-border bg-card text-muted-foreground",
           )}
         >
           <span aria-hidden>⚡</span>
-          {todayCtx?.energyLevel ? `${todayCtx.energyLevel}/5` : "—"}
+          {clampEnergy(todayCtx?.energyLevel) != null
+            ? `${clampEnergy(todayCtx?.energyLevel)}/5`
+            : "—"}
         </button>
         <button
           onClick={() => {
@@ -569,12 +626,17 @@ export default function TodayPage() {
 
       {/* Chat */}
       <div className="flex-1 flex flex-col overflow-hidden px-5">
-        <div className="flex-1 overflow-y-auto space-y-3 pb-3 hide-scrollbar">
+        <div
+          ref={chatListRef}
+          onScroll={onChatScroll}
+          className="flex-1 overflow-y-auto space-y-3 pb-3 hide-scrollbar"
+        >
           {messages.map((msg, i) => (
             <div
               key={i}
               className={cn(
-                "flex gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300",
+                "flex gap-2",
+                !msg.streaming && "animate-in fade-in slide-in-from-bottom-2 duration-300",
                 msg.role === "user" ? "flex-row-reverse" : "flex-row",
               )}
             >
@@ -592,12 +654,21 @@ export default function TodayPage() {
                 )}
               >
                 {msg.role === "assistant" ? (
-                  <TypewriterText text={msg.content} live={Boolean(msg.streaming)} />
+                  msg.streaming ? (
+                    <>
+                      {msg.content}
+                      <span
+                        className="ml-0.5 inline-block h-[1.1em] w-[2px] translate-y-[2px] bg-primary align-middle animate-pulse"
+                        aria-hidden
+                      />
+                    </>
+                  ) : i === 0 && messages.length === 1 ? (
+                    <TypewriterText text={msg.content} />
+                  ) : (
+                    msg.content
+                  )
                 ) : (
                   msg.content
-                )}
-                {msg.streaming && (
-                  <span className="ml-1 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-current" />
                 )}
               </div>
             </div>

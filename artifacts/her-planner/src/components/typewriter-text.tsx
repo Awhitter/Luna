@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Props = {
   text: string;
@@ -8,19 +8,34 @@ type Props = {
   className?: string;
 };
 
-/** Soft typewriter for finished assistant turns — skipped while streaming. */
+/**
+ * Soft typewriter for local greetings only.
+ * Never wipe/replay after a live stream — if we already showed text while live,
+ * keep it and skip the interval path.
+ */
 export function TypewriterText({ text, live = false, cps = 48, className }: Props) {
   const [shown, setShown] = useState(live ? text : "");
+  const wasLive = useRef(live);
 
   useEffect(() => {
     if (live) {
+      wasLive.current = true;
       setShown(text);
       return;
     }
+
+    // Finished a streamed turn — keep whatever is already on screen
+    if (wasLive.current) {
+      wasLive.current = false;
+      setShown(text);
+      return;
+    }
+
     if (!text) {
       setShown("");
       return;
     }
+
     let i = 0;
     setShown("");
     const step = Math.max(1, Math.floor(cps / 20));

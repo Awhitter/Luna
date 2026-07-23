@@ -23,7 +23,7 @@ export const INTENTS: IntentDefinition[] = [
     },
     toolPolicy: "all",
     systemNudge:
-      "She asked you to find ways. Offer 3–5 concrete, realistic options. If the fill is about money, stay practical (skills she has, nap-window gigs) — no get-rich schemes.",
+      "FIND WAYS: Offer at most 3 concrete options. Each option = one short line + why it fits TODAY's energy from AUTHORITATIVE (if logged). No essays, no hustle-bro tone. End with exactly one question asking which option to map next.",
   },
   {
     id: "solve",
@@ -34,7 +34,7 @@ export const INTENTS: IntentDefinition[] = [
     },
     toolPolicy: "all",
     systemNudge:
-      "She wants a clear solve. Break it into small steps. Use tools when a task/symptom/memory helps; otherwise just decide with her.",
+      "SOLVE: Give a clear decision path — at most 3 steps or options. Use tools when a task/symptom/memory helps. Keep under ~120 words. End with one question.",
   },
   {
     id: "make",
@@ -45,7 +45,7 @@ export const INTENTS: IntentDefinition[] = [
     },
     toolPolicy: "all",
     systemNudge:
-      "She wants something made (note, post, story, craft idea). Draft it ready to use; keep it short unless she asks for more.",
+      "MAKE: Deliver one ready-to-use draft or micro-plan (note, post, recipe outline, craft idea). Keep it short unless they ask for more. End with one question.",
   },
   {
     id: "listen",
@@ -56,7 +56,7 @@ export const INTENTS: IntentDefinition[] = [
     },
     toolPolicy: "none",
     systemNudge:
-      "LISTENER MODE: Sit with her. No task lists, no productivity coaching, no 'here's what you should do' unless she explicitly asks. Warm presence only. Tools are disabled — do not try to add tasks.",
+      "LISTENER MODE: Sit with them. No task lists, no productivity coaching, no 'here's what you should do' unless they explicitly ask. Warm presence only. Short. Tools are disabled — do not try to add tasks.",
   },
   {
     id: "feel",
@@ -67,7 +67,7 @@ export const INTENTS: IntentDefinition[] = [
     },
     toolPolicy: "journal",
     systemNudge:
-      "Help her move toward that feeling with gentle ideas. Journal lean: you may remember a meaningful preference, but do not pile on tasks unless she asks.",
+      "FEEL: Help them move toward that feeling with one gentle idea or micro-ritual. Journal lean: you may remember a meaningful preference. Do not pile on tasks unless they ask. End with one question.",
   },
 ];
 
